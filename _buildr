@@ -31,7 +31,7 @@ cmd = [
 cmd.push '-e', %q{
   start = Time.now
   require 'rubygems'
-  gem 'rake', '0.8.1' # Required since Buildr won't run with 0.8.2 for now.
+  gem 'rake', '0.8.2' # Required since Buildr won't run with 0.8.2 for now.
   require 'buildr'
   Buildr.application.run
   if verbose
