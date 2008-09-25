@@ -52,7 +52,8 @@ module Buildr
     Buildr.application.iface.add_option '--directory DIR', '-C', 
     'Change to DIR before doing anything.', 
     'DIR must be a path' do |value|
-      raise ArgumentError, "Not a directory: #{value}" unless File.expand_path(value, original_dir)
+      value = File.expand_path(value, original_dir)
+      raise ArgumentError, "Not a directory: #{value}" unless File.directory?(value)
       options.requested_workdir = value
     end
 
