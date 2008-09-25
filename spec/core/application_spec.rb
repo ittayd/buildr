@@ -32,7 +32,7 @@ describe Buildr::Application do
   describe '#run' do
     it 'should execute *_load methods in order' do
       last = nil
-      order = [:find_buildfile, :load_gems, :load_artifacts, :load_tasks, 
+      order = [:init_iface, :find_buildfile, :change_workdir, :load_gems, :load_artifacts, :load_tasks,
                :load_requires, :load_buildfile, :load_imports, :top_level]
       order.each { |method| Buildr.application.should_receive(method).ordered }
       Buildr.application.stub!(:exit) # With this, shows the correct error instead of SystemExit.
