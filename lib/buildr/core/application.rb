@@ -292,16 +292,14 @@ module Buildr
       @gems = installed
     end
 
-    def find_buildfile #:nodoc:      
+    def find_buildfile #:nodoc:
       here = original_dir
       locate_rakefile = lambda { Dir['{'+rakefiles.map{ |rf| File.expand_path(rf, here) }.join(',')+'}'].first }
-      until (found = locate_rakefile.call) || options.nosearch
+      until rakefile || (@rakefile = locate_rakefile.call) || options.nosearch
         break if File.dirname(here) == here
         here = File.dirname(here)
       end
-      if found
-        @rakefile = found
-      else
+      unless rakefile
         error = "No Buildfile found (looking for: #{rakefiles.join(', ')})"
         if STDIN.isatty
           task('generate').invoke
@@ -312,9 +310,14 @@ module Buildr
       end
     end
 
-    # Execute a block on the directory having the buildfile.
-    def change_workdir(&block)
-      Dir.chdir(File.dirname(rakefile), &block)
+    # Change the working directory unless we are currently there.
+    def change_workdir(dir = nil, &block)
+      dir ||= File.dirname(rakefile)
+      if Dir.pwd == dir
+        yield Dir.pwd
+      else
+        Dir.chdir(dir, &block)
+      end
     end
 
     def load_buildfile #:nodoc:
