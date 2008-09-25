@@ -149,7 +149,18 @@ module Buildr
     end # Gems
 
   end # Util
-end
+
+  # Helper for lazy method application.
+  class Message < Struct.new(:name, :args, :block) # :nodoc:
+    def send_to(object)
+      object.send(name, *args, &block)
+    end
+    def to_proc
+      lambda { |object| send_to(object) }
+    end
+  end
+
+end # Buildr
 
 
 if RUBY_VERSION < '1.9.0'
@@ -180,6 +191,30 @@ if RUBY_VERSION < '1.9.0'
       [Kernel]
     end
   end
+
+  unless Kernel.respond_to?(:instance_exec)
+    # Also borrowed from Ruby 1.9.
+    class Object # :nodoc:
+      def instance_exec(*arguments, &block)
+        block.bind(self)[*arguments]
+      end
+    end
+    
+    # Needed for instance_exec
+    class Proc #:nodoc:
+      def bind(object)
+        block, time = self, Time.now
+        (class << object; self end).class_eval do
+          method_name = "__bind_#{time.to_i}_#{time.usec}"
+          define_method(method_name, &block)
+          method = instance_method(method_name)
+          remove_method(method_name)
+          method
+        end.bind(object)
+      end
+    end
+  end
+
 end
 
 

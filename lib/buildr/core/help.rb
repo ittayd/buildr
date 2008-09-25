@@ -55,7 +55,10 @@ end
 
 task 'help' do
   # Greeater.
-  Buildr.application.usage
+  puts Buildr.application.version
+  puts
+  puts 'Usage:'
+  puts '  ' + Buildr.application.iface.usage
   puts
 
   # Show only the top-level projects.
