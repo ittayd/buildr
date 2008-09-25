@@ -51,8 +51,9 @@ describe Buildr::Application do
     end
 
     it 'should set environment name from -e argument' do
-      ARGV.push('-e', 'test')
-      Buildr::Application.new.environment.should eql('test')
+      app = Buildr::Application.new
+      app.send :init_iface, ['-e', 'test']
+      app.environment.should eql('test')
       ENV['BUILDR_ENV'].should eql('test')
     end
     
