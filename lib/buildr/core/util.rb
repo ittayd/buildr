@@ -100,6 +100,18 @@ module Buildr
       to_path.relative_path_from(from_path).to_s
     end
 
+    # Search for a file starting from +dir+ and seeking on the parent
+    # directories unless nosearch
+    def find_file_updir(dir, names, nosearch = false)
+      here = dir
+      locate_rakefile = lambda { Dir['{'+names.map{ |rf| File.expand_path(rf, here) }.join(',')+'}'].first }
+      until (found = locate_rakefile.call) || nosearch
+        break if File.dirname(here) == here
+        here = File.dirname(here)
+      end
+      found
+    end
+
     # Generally speaking, it's not a good idea to operate on dot files (files starting with dot).
     # These are considered invisible files (.svn, .hg, .irbrc, etc).  Dir.glob/FileList ignore them
     # on purpose.  There are few cases where we do have to work with them (filter, zip), a better
