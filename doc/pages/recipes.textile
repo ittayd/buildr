@@ -9,10 +9,10 @@ Doing so is the recommended way to handle the following situations:
 
 * Force to use an specific gem version
 
-Sometimes having several versions of a gem installed can cause imcompatibility problems.
+Sometimes having several versions of a gem installed can cause incompatibility problems.
 For example when rake 0.8.2 was released, buildr failed because of some major changes in rake
-inner workings, so the workaround to this was to require the previous stable rake version
-until a new buildr version was released.
+inner workings, so the workaround to this was to require the previous usable rake version
+until a new buildr release was out.
     
 * Extend Buildr using addons/workarounds
 
