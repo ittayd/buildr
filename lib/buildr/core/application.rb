@@ -314,7 +314,7 @@ module Buildr
     def change_workdir(dir = nil, &block)
       dir ||= File.dirname(rakefile)
       if Dir.pwd == dir
-        yield Dir.pwd
+        yield dir if block
       else
         Dir.chdir(dir, &block)
       end
