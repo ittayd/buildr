@@ -36,7 +36,7 @@ module Buildr
   # This yaml is a simple hash:
   #
   #   ## with.yml ##
-  #     :foo: sure                # --with-foo, --without-foo  (default: 'sure')
+  #     \:foo: sure                # --with-foo, --without-foo  (default: 'sure')
   #     --[no-]thanks: false      # --thanks and --no-thanks flags (default: false)
   #     bar: 99BottlesOfBeer      # --bar flag
   #     -s [VALUE]: GreenEyes     # -s flag with optional argument (default: 'GreenEyes')
