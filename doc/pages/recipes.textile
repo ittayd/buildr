@@ -2,6 +2,44 @@ h1. Recipes
 
 Commond recipes for Buildr, collected from the mailing list.
 
+h2.  Making your buildfile executable
+
+In some situations it may be useful to make your buildfile an executable script.
+Doing so is the recommended way to handle the following situations:
+
+* Force to use an specific gem version
+
+Sometimes having several versions of a gem installed can cause imcompatibility problems.
+For example when rake 0.8.2 was released, buildr failed because of some major changes in rake
+inner workings, so the workaround to this was to require the previous stable rake version
+until a new buildr version was released.
+    
+* Extend Buildr using addons/workarounds
+
+Buildr is a very extensible system, mainly because it's implemented in pure ruby.
+Some addons are included with Buildr to help you learn how to do what you need. 
+You can do just everything you need, like adding your own command line options
+@--with-feature@, @--without-feature@. The @buildr/path@ addon is an example of this.
+
+To make your buildfile executable, modify it to look something like..
+
+{{{!ruby
+#/usr/bin/env ruby
+exit !!eval(DATA.read, binding) if $0 === __FILE__
+
+# All your project definitions go here
+
+__END__
+require 'rubygems'
+gem 'rake', '0.8.2'      # We want buildr to use this version even if we have others installed.
+gem 'buildr', '>= 1.3.3' # buildfile is compatible with these Buildr versions
+require 'buildr'
+# require addons or your own files to extend Buildr.
+Buildr.application.run(ARGV)
+}}}
+
+I recommend you to keep the code after __END__ at a minimum, prefer to require your own files
+intead of adding more code to it.
 
 h2.  Creating a classpath
 

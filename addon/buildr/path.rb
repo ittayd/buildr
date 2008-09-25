@@ -52,7 +52,7 @@ module Buildr
   # If you always want to use path-like arguments for your project, you may want to edit your buildfile like:
   #
   #   #!/usr/bin/env ruby
-  #   exit !!eval(DATA.read) if $0 == __FILE__ # run buildr unless included
+  #   exit !!eval(DATA.read, binding) if $0 == __FILE__ # run buildr unless included
   #
   #   # all your buildfile project definitions go here
   #
