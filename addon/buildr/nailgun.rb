@@ -294,16 +294,6 @@ module Buildr #:nodoc:
         result
       end
 
-      def find_file(pwd, candidates, nosearch=false)
-        candidates = [candidates].flatten
-        buildfile = candidates.find { |c| File.file?(File.expand_path(c, pwd)) }
-        return File.expand_path(buildfile, pwd) if buildfile
-        return nil if nosearch
-        updir = File.dirname(pwd)
-        return nil if File.expand_path(updir) == File.expand_path(pwd)
-        find_file(updir, candidates)
-      end
-
       def exception_handling(raise_again = true, show_error = true)
         begin
           yield
@@ -332,7 +322,7 @@ module Buildr #:nodoc:
             parameters.push(value)
           else
             parameters.push obj
-            classes.push obj.java_class
+            classes.push obj.class.java_class
           end
         end
         on_class = [on_class.java_class].to_java(java.lang.Class)[0]
@@ -479,8 +469,24 @@ module Buildr #:nodoc:
     module Client
 
       class << self
-        include Buildr::CommandLineInterface
-
+        def parse_options(argv)
+          argv = argv.dup
+          argv = argv[0...idx] if idx = argv.index('--')
+          if (argv.index('-h') || argv.index('--help'))
+            return options.exit = :help
+          elsif (argv.index('-v') || argv.index('--version'))
+            return options.exit = :version
+          elsif argv.index('-n') || argv.index('--no-search') || argv.index('--no-search')
+            options.nosearch = true
+          end
+          while idx = (argv.index('-f') || argv.index('--buildfile'))
+            raise "missing argument: --buildfile" unless val = argv[idx+1]
+            argv[idx,2] = []
+            rakefiles.replace [val]
+          end
+          # buildfile specified ? 
+        end
+        
         def options
           Nailgun.ng.nail.options
         end
@@ -492,29 +498,16 @@ module Buildr #:nodoc:
         def requires
           Nailgun.ng.nail.options.requires
         end
-        
+
         def help
-          super
-          puts 
-          puts 'To get a summary of Nailgun features use'
-          puts '  nailgun:help'        
+          Nailgun.ng.nail.out.println sBuildr.application.iface.help
+          Nailgun.ng.nail.out.println ''
+          Nailgun.ng.nail.out.println 'To get a summary of Nailgun features use'
+          Nailgun.ng.nail.out.println '  nailgun:help'        
         end
 
         def version
-          puts super
-        end
-
-        def do_option(opt, value)
-          case opt
-          when '--help'
-            options.exit = :help
-          when '--version'
-            options.exit = :version
-          when '--nosearch'
-            options.nosearch = true
-          else
-            super
-          end
+          Nailgun.ng.nail.out.println sBuildr.application.version
         end
 
         def sBuildr
@@ -547,17 +540,14 @@ module Buildr #:nodoc:
 
         Client.client(nail.jruby, nail) do
           
-          parse_options
-          if options.exit
-            send(options.exit)
-            nail.exit(0)
-          end
+          parse_options(nail.argv)
+          return nail.exit(!!send(options.exit) ? 0 : 1) if options.exit
 
           if options.project && File.directory?(options.project)
             Dir.chdir(options.project)
           end
           
-          bf = Util.find_file(Dir.pwd, options.rakefiles, options.nosearch)
+          bf = Buildr::Util.find_file_updir(Dir.pwd, options.rakefiles, options.nosearch)
           unless bf
             nail.out.println "No buildfile found at #{Dir.pwd}"
             nail.exit(0)
@@ -591,9 +581,7 @@ module Buildr #:nodoc:
           Client.client(rt, nail) do
             Util.exception_handling do
               begin
-                app.parse_options
-                app.collect_tasks
-                app.run
+                app.run(nail.argv)
               rescue SystemExit => e
                 nail.exit(1)
               end
