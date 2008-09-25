@@ -24,9 +24,11 @@ module Buildr
   # for example the --with-feature, --without-feature used by `make' tools.
   # loaded from a yaml file. It also serves as an example for --require-early option.
   #
-  # Usage: 
+  # == Usage
   #
   #   buildr -R buildr/with --help
+  #
+  # If you find this addon useful, make sure to read the TIP at end of this doc.
   # 
   # Note: Because this file extends Buildr command line arguments, it needs to be loaded during 
   #       the bootstrap process (Prior to parsing the command line). 
@@ -103,6 +105,34 @@ module Buildr
   #
   #   buildr -R with
   #
+  #
+  # === TIP: Make your buildfile executable 
+  # 
+  # To avoid typing -R each time, you can make your buildfile executable, just edit it like this:
+  #
+  #   #!/usr/bin/env ruby
+  #   exit !!eval(DATA.read) if $0 == __FILE__ # run buildr unless included
+  #
+  #
+  #   # all your buildfile project definitions go here
+  #   define('foo') do 
+  #      define('bar') do
+  #        puts "Defined because you enabled it with command line option"
+  #      end if Buildr.application.options.with.bar
+  #   end
+  #
+  #   
+  #   __END__
+  #   require 'rubygems'
+  #   require 'buildr'
+  #   require 'buildr/with' # load this addon
+  #   with_option '--[no-]bar', 'Enable bar', 'Disable bar', false
+  #   Buildr.application.run(ARGV)
+  #
+  # Then just make it executable..
+  #   chmod 755 buildfile 
+  # And run it
+  #   ./buildfile --bar
   module WithOption
     extend self
 
@@ -127,7 +157,7 @@ module Buildr
       block ||= setter(property)
       block[default]
       if Array === flags || flags.to_s[/^-/] || positive == negative
-        args = ['positive']
+        args = [positive]
         if Array === flags
           args.unshift(*flags)
         else
