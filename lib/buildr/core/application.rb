@@ -293,12 +293,7 @@ module Buildr
     end
 
     def find_buildfile #:nodoc:
-      here = original_dir
-      locate_rakefile = lambda { Dir['{'+rakefiles.map{ |rf| File.expand_path(rf, here) }.join(',')+'}'].first }
-      until rakefile || (@rakefile = locate_rakefile.call) || options.nosearch
-        break if File.dirname(here) == here
-        here = File.dirname(here)
-      end
+      @rakefile = Util.find_file_updir(original_dir, rakefiles, options.nosearch) unless rakefile
       unless rakefile
         error = "No Buildfile found (looking for: #{rakefiles.join(', ')})"
         if STDIN.isatty
@@ -365,7 +360,7 @@ module Buildr
       rescue SystemExit => ex
         # Exit silently with current status
         exit(ex.status)
-      rescue SystemExit, GetoptLong::InvalidOption => ex
+      rescue SystemExit, OptionParser::InvalidOption => ex
         # Exit silently
         exit(1)
       rescue Exception => ex
