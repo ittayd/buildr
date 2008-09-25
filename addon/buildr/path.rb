@@ -20,7 +20,7 @@ module Buildr
   # and other unix programs have.
   # 
   #
-  # Usage:
+  # == Usage:
   #    buildr -R buildr/path --help
   #
   # Note: This file must be loaded using the --require-early (-R) option since it
@@ -47,6 +47,25 @@ module Buildr
   # 
   #   buildr -R buildr/path ./api/target/api-1.0.0.jar
   #
+  # === TIP: Make your buildfile executable.
+  #
+  # If you always want to use path-like arguments for your project, you may want to edit your buildfile like:
+  #
+  #   #!/usr/bin/env ruby
+  #   exit !!eval(DATA.read) if $0 == __FILE__ # run buildr unless included
+  #
+  #   # all your buildfile project definitions go here
+  #
+  #   __END__
+  #   require 'rubygems'
+  #   require 'buildr'
+  #   require 'buildr/path' # load this addon
+  #   Buildr.application.run(ARGV)
+  #
+  # Then just make it executable..
+  #   chmod 755 buildfile
+  # And run it
+  #   ./buildfile -p deep/down/project clean compile api/install
   module PathArgs
     
     Buildr.application.iface.add_option '--directory DIR', '-C', 
