@@ -153,9 +153,9 @@ module Buildr
       buildfile.prerequisites
     end
 
-    def run
+    def run(argv = ARGV)
       standard_exception_handling do
-        init_iface
+        init_iface(argv)
         find_buildfile
         change_workdir
         load_gems
@@ -225,7 +225,7 @@ module Buildr
   private
     
     # Initialize from the application interface
-    def init_iface(argv = ARGV)
+    def init_iface(argv)
       iface.parse_options(argv.clone)
       collect_tasks iface.argv # collect tasks from the parsed argv
     end
