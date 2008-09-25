@@ -74,11 +74,11 @@ module Buildr
   #      
   #
   # You can access the values on your buildfile using 
-  #   Buildr.application.options.with
+  #   Buildr.application.with
   #
   #   ## buildfile ##
-  #   puts "Features are: ", Buildr.application.options.with.inspect
-  #   if Buildr.application.options.with.thanks
+  #   puts "Features are: ", Buildr.application.with.inspect
+  #   if Buildr.application.with.thanks
   #     describe('thanks-project') do
   #        package(:jar) # etc
   #     end
@@ -93,7 +93,7 @@ module Buildr
   #      module Buildr::WithOption
   #         @dont_seek_yaml_files = true # set nil to disable seeking or set to an array of file names to search
   #         # override the :setter method to return a lambda to set values on
-  #         # a different object than the default: Buildr.application.options.with
+  #         # a different object than the default: Buildr.application.with
   #      end
   #      require 'buildr/with'
   #      # You can manually setup your features here..
@@ -118,7 +118,7 @@ module Buildr
   #   define('foo') do 
   #      define('bar') do
   #        puts "Defined because you enabled it with command line option"
-  #      end if Buildr.application.options.with.bar
+  #      end if Buildr.application.with.bar
   #   end
   #
   #   
@@ -189,11 +189,11 @@ module Buildr
   protected
     
     # Return a lambda for setting property
-    # Override this method to set values on other than Buildr.application.options.with
+    # Override this method to set values on other than Buildr.application.with
     def setter(property)
       lambda do |value| 
-        Buildr.application.options.with ||= OpenStruct.new
-        Buildr.application.options.with.send("#{property}=", value)
+        Buildr.application.with ||= OpenStruct.new
+        Buildr.application.with.send("#{property}=", value)
       end
     end unless method_defined?(:setter)
     
@@ -220,7 +220,14 @@ module Buildr
     end
     
     seek_yaml_files(FILES) if const_defined?(:FILES) && !@dont_seek_yaml_files
+
+    unless Buildr.application.respond_to?(:with)
+      def (Buildr.application).with
+        @with ||= OpenStruct.new
+      end 
+    end
     
   end # WithOption
+
 end
 
