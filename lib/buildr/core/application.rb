@@ -109,8 +109,6 @@ module Buildr
 
     DEFAULT_BUILDFILES = ['buildfile', 'Buildfile'] + DEFAULT_RAKEFILES
     
-    include CommandLineInterface
-
     attr_reader :rakefiles, :requires
     private :rakefiles, :requires
 
@@ -120,8 +118,6 @@ module Buildr
       @name = 'Buildr'
       @requires = []
       @top_level_tasks = []
-      parse_options
-      collect_tasks
       @home_dir = File.expand_path('.buildr', ENV['HOME'])
       mkpath @home_dir, :verbose=>false unless File.exist?(@home_dir)
       @environment = ENV['BUILDR_ENV'] ||= 'development'
@@ -159,7 +155,9 @@ module Buildr
 
     def run
       standard_exception_handling do
+        init_iface
         find_buildfile
+        change_workdir
         load_gems
         load_artifacts
         load_tasks
@@ -213,7 +211,42 @@ module Buildr
       end
     end
 
+    # The user interface.
+    # Currently Buildr only runs on command line
+    def iface # :nodoc:
+      @iface ||= CommandLineInterface.new(self)
+    end
+
+    # Return the version string
+    def version #:nodoc:
+      "Buildr #{Buildr::VERSION} #{RUBY_PLATFORM[/java/] && '(JRuby '+JRUBY_VERSION+')'}"
+    end
+
   private
+    
+    # Initialize from the application interface
+    def init_iface(argv = ARGV)
+      iface.parse_options(argv.clone)
+      collect_tasks iface.argv # collect tasks from the parsed argv
+    end
+
+    # Collect the list of tasks on the command line.  If no tasks are
+    # given, return a list containing only the default task.
+    # Environmental assignments are processed at this time as well.
+    #
+    # Note: Buildr's version of this method upcases the environment
+    # variables, thus it differs from Rake's impl.
+    def collect_tasks(argv) #:nodoc:
+      @top_level_tasks = []
+      argv.each do |arg|
+        if arg =~ /^(\w+)=(.*)$/
+          ENV[$1.upcase] = $2
+        else
+          top_level_tasks << arg unless arg =~ /^-/
+        end
+      end
+      top_level_tasks.push("default") if top_level_tasks.size == 0
+    end
 
     # Returns Gem::Specification for every listed and installed Gem, Gem::Dependency
     # for listed and uninstalled Gem, which is the installed before loading the buildfile.
@@ -259,22 +292,29 @@ module Buildr
       @gems = installed
     end
 
-    def find_buildfile #:nodoc:
+    def find_buildfile #:nodoc:      
       here = original_dir
-      Dir.chdir(here) unless Dir.pwd == here
-      while ! have_rakefile
-        Dir.chdir('..')
-        if Dir.pwd == here || options.nosearch
-          error = "No Buildfile found (looking for: #{@rakefiles.join(', ')})"
-          if STDIN.isatty
-            chdir(original_dir) { task('generate').invoke }
-            exit 1
-          else
-            raise error
-          end
-        end
-        here = Dir.pwd
+      locate_rakefile = lambda { Dir['{'+rakefiles.map{ |rf| File.expand_path(rf, here) }.join(',')+'}'].first }
+      until (found = locate_rakefile.call) || options.nosearch
+        break if File.dirname(here) == here
+        here = File.dirname(here)
       end
+      if found
+        @rakefile = found
+      else
+        error = "No Buildfile found (looking for: #{rakefiles.join(', ')})"
+        if STDIN.isatty
+          task('generate').invoke
+          exit 1
+        else
+          raise error
+        end
+      end
+    end
+
+    # Execute a block on the directory having the buildfile.
+    def change_workdir(&block)
+      Dir.chdir(File.dirname(rakefile), &block)
     end
 
     def load_buildfile #:nodoc:
@@ -334,7 +374,7 @@ module Buildr
         if options.trace
           $stderr.puts ex.backtrace.join("\n")
         else
-          $stderr.puts ex.backtrace.select { |str| str =~ /#{buildfile}/ }.map { |line| $terminal.color(line, :red) }.join("\n")
+          $stderr.puts ex.backtrace.select { |str| str =~ /#{rakefile}/ }.map { |line| $terminal.color(line, :red) }.join("\n")
           $stderr.puts "(See full trace by running task with --trace)"
         end
         exit(1)
