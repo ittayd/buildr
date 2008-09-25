@@ -14,39 +14,39 @@
 # the License.
 
 
-# This Addon extends Buildr with a -C command line option like `make', `tar'
-# and other unix programs have.
-# 
-#
-# Usage:
-#    buildr -R buildr/path --help
-#
-# Note: This file must be loaded using the --require-early (-R) option since it
-# needs to be run before command line argument processing takes place.
-#
-# The --directory (-C) option instructs buildr to change the working directory
-# before trying to find the buildfile. This option can be useful when invoking
-# buildr from other build systems, most likely by your system package manager.
-#
-# The --project (-p) option specifies the default project to run tasks on, for example:
-# instead of:
-#
-#   buildr deep:down:project:clean deep:down:project:compile deep:down:project:api:install
-# 
-# you can do
-#
-#   buildr -R buildr/path -p deep/down/project clean compile api/install
-#
-# You can do for example, to invoke the compile target on subproj:
-#
-#   buildr -R buildr/path some/very/nested/subproj/compile
-# 
-# Or invoke a filetask by its path:
-# 
-#   buildr -R buildr/path ./api/target/api-1.0.0.jar
-#
 module Buildr 
-  
+
+  # This Addon extends Buildr with a -C command line option like `make', `tar'
+  # and other unix programs have.
+  # 
+  #
+  # Usage:
+  #    buildr -R buildr/path --help
+  #
+  # Note: This file must be loaded using the --require-early (-R) option since it
+  # needs to be run before command line argument processing takes place.
+  #
+  # The --directory (-C) option instructs buildr to change the working directory
+  # before trying to find the buildfile. This option can be useful when invoking
+  # buildr from other build systems, most likely by your system package manager.
+  #
+  # The --project (-p) option specifies the default project to run tasks on, for example:
+  # instead of:
+  #
+  #   buildr deep:down:project:clean deep:down:project:compile deep:down:project:api:install
+  # 
+  # you can do
+  #
+  #   buildr -R buildr/path -p deep/down/project clean compile api/install
+  #
+  # You can do for example, to invoke the compile target on subproj:
+  #
+  #   buildr -R buildr/path some/very/nested/subproj/compile
+  # 
+  # Or invoke a filetask by its path:
+  # 
+  #   buildr -R buildr/path ./api/target/api-1.0.0.jar
+  #
   module PathArgs
     
     Buildr.application.iface.add_option '--directory DIR', '-C', 
@@ -104,7 +104,7 @@ module Buildr
       end
       super
     end
-     
+    
   end # PathArgs
   
   Buildr.application.extend PathArgs

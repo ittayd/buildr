@@ -14,95 +14,95 @@
 # the License.
 
 
-# This Addon extends Buildr to add custom command line argument options
-# for example the --with-feature, --without-feature used by `make' tools.
-# loaded from a yaml file. It also serves as an example for --require-early option.
-#
-# Usage: 
-#
-#   buildr -R buildr/with --help
-# 
-# Note: Because this file extends Buildr command line arguments, it needs to be loaded during 
-#       the bootstrap process (Prior to parsing the command line). 
-#       So it needs to be loaded using the --require-early (-R) option.
-#
-# By default this addon searches a file named with.yml (actually any on FILES).
-# This yaml is a simple hash:
-#
-#   ## with.yml ##
-#     :foo: sure                # --with-foo, --without-foo  (default: 'sure')
-#     --[no-]thanks: false      # --thanks and --no-thanks flags (default: false)
-#     bar: 99BottlesOfBeer      # --bar flag
-#     -s [VALUE]: GreenEyes     # -s flag with optional argument (default: 'GreenEyes')
-#
-#     # Using custom descriptions:
-#     custom: 
-#       positive: load user customization     # description for enabled flag
-#       negative: Use generic settings        # description for disabled flag
-#       default: false
-#
-#     --[no-]pain:                            # use the option as is
-#       description: "Call the doctor!"
-#       default: false
-#
-#     -N, --name NAME:                        # use option as is
-#       description: 'Set my name'
-#       default: Lael
-#
-#  Running 
-#    buildr -R buildr/with --help 
-#  will display in addition to Buildr standard options:
-#
-#    -N, --name NAME                  Set my name
-#        --[no-]pain                  Call the doctor!
-#    -s [VALUE]                       Enable s
-#        --with-bar                   Enable bar
-#        --without-bar                Disable bar
-#        --with-custom                load user customization
-#        --without-custom             Use generic settings
-#        --[no-]thanks                Enable thanks
-#        --with-foo                   Enable foo
-#        --without-foo                Disable foo
-#      
-#
-# You can access the values on your buildfile using 
-#   Buildr.application.options.with
-#
-#   ## buildfile ##
-#   puts "Features are: ", Buildr.application.options.with.inspect
-#   if Buildr.application.options.with.thanks
-#     describe('thanks-project') do
-#        package(:jar) # etc
-#     end
-#   else
-#     info "You can thank me later"
-#   end
-# 
-# If you want to prevent this addon from seeking a yaml file, because you want to manually
-# setup the features, you need to create a ruby file, say .. with.rb having 
-#
-#   ## with.rb ##
-#      module Buildr::WithOption
-#         @dont_seek_yaml_files = true # set nil to disable seeking or set to an array of file names to search
-#         # override the :setter method to return a lambda to set values on
-#         # a different object than the default: Buildr.application.options.with
-#      end
-#      require 'buildr/with'
-#      # You can manually setup your features here..
-#      Buildr::WithOption(:moo, "Use cows", "Use pigs") do |value|
-#         # set the value somewhere accessible from the buildfile
-#      end
-#
-# Then load with.rb instead of buildr/with.rb:  
-#
-#   buildr -R with
-#
 module Buildr
 
-  def WithOption(*args, &block)
+  def with_option(*args, &block)
     WithOption.add(*args, &block)
   end
-  
+
+  # This Addon extends Buildr to add custom command line argument options
+  # for example the --with-feature, --without-feature used by `make' tools.
+  # loaded from a yaml file. It also serves as an example for --require-early option.
+  #
+  # Usage: 
+  #
+  #   buildr -R buildr/with --help
+  # 
+  # Note: Because this file extends Buildr command line arguments, it needs to be loaded during 
+  #       the bootstrap process (Prior to parsing the command line). 
+  #       So it needs to be loaded using the --require-early (-R) option.
+  #
+  # By default this addon searches a file named with.yml (actually any on FILES).
+  # This yaml is a simple hash:
+  #
+  #   ## with.yml ##
+  #     :foo: sure                # --with-foo, --without-foo  (default: 'sure')
+  #     --[no-]thanks: false      # --thanks and --no-thanks flags (default: false)
+  #     bar: 99BottlesOfBeer      # --bar flag
+  #     -s [VALUE]: GreenEyes     # -s flag with optional argument (default: 'GreenEyes')
+  #
+  #     # Using custom descriptions:
+  #     custom: 
+  #       positive: load user customization     # description for enabled flag
+  #       negative: Use generic settings        # description for disabled flag
+  #       default: false
+  #
+  #     --[no-]pain:                            # use the option as is
+  #       description: "Call the doctor!"
+  #       default: false
+  #
+  #     -N, --name NAME:                        # use option as is
+  #       description: 'Set my name'
+  #       default: Lael
+  #
+  #  Running 
+  #    buildr -R buildr/with --help 
+  #  will display in addition to Buildr standard options:
+  #
+  #    -N, --name NAME                  Set my name
+  #        --[no-]pain                  Call the doctor!
+  #    -s [VALUE]                       Enable s
+  #        --with-bar                   Enable bar
+  #        --without-bar                Disable bar
+  #        --with-custom                load user customization
+  #        --without-custom             Use generic settings
+  #        --[no-]thanks                Enable thanks
+  #        --with-foo                   Enable foo
+  #        --without-foo                Disable foo
+  #      
+  #
+  # You can access the values on your buildfile using 
+  #   Buildr.application.options.with
+  #
+  #   ## buildfile ##
+  #   puts "Features are: ", Buildr.application.options.with.inspect
+  #   if Buildr.application.options.with.thanks
+  #     describe('thanks-project') do
+  #        package(:jar) # etc
+  #     end
+  #   else
+  #     info "You can thank me later"
+  #   end
+  # 
+  # If you want to prevent this addon from seeking a yaml file, because you want to manually
+  # setup the features, you need to create a ruby file, say .. with.rb having 
+  #
+  #   ## with.rb ##
+  #      module Buildr::WithOption
+  #         @dont_seek_yaml_files = true # set nil to disable seeking or set to an array of file names to search
+  #         # override the :setter method to return a lambda to set values on
+  #         # a different object than the default: Buildr.application.options.with
+  #      end
+  #      require 'buildr/with'
+  #      # You can manually setup your features here..
+  #      Buildr.with_option(:moo, "Use cows", "Use pigs") do |value|
+  #         # set the value somewhere accessible from the buildfile
+  #      end
+  #
+  # Then load with.rb instead of buildr/with.rb:  
+  #
+  #   buildr -R with
+  #
   module WithOption
     extend self
 
