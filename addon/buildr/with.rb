@@ -113,14 +113,12 @@ module Buildr
   #   #!/usr/bin/env ruby
   #   exit !!eval(DATA.read) if $0 == __FILE__ # run buildr unless included
   #
-  #
   #   # all your buildfile project definitions go here
   #   define('foo') do 
   #      define('bar') do
   #        puts "Defined because you enabled it with command line option"
   #      end if Buildr.application.with.bar
   #   end
-  #
   #   
   #   __END__
   #   require 'rubygems'
@@ -188,14 +186,15 @@ module Buildr
 
   protected
     
-    # Return a lambda for setting property
-    # Override this method to set values on other than Buildr.application.with
-    def setter(property)
-      lambda do |value| 
-        Buildr.application.with ||= OpenStruct.new
-        Buildr.application.with.send("#{property}=", value)
+    unless method_defined?(:setter)
+      # Return a lambda for setting property
+      # Override this method to set values on other than Buildr.application.with
+      def setter(property)
+        lambda do |value|
+          Buildr.application.with.send("#{property}=", value)
+        end
       end
-    end unless method_defined?(:setter)
+    end
     
     def find_file(names, options = {})
       here = options[:from] || Dir.pwd
