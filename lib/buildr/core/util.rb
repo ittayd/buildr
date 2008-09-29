@@ -162,31 +162,5 @@ module Buildr
 
   end # Util
 
-  # Helper for lazy method application.
-  class Message < Struct.new(:name, :args, :block) # :nodoc:
-    def send_to(object)
-      object.send(name, *args, &block)
-    end
-    def to_proc
-      lambda { |object| send_to(object) }
-    end
-  end
-  
-  class MessageChain #:nodoc:
-    attr_accessor :messages
-    
-    def method_missing(name, *args, &block)
-      (@messages ||= []) << Message.new(name, args, &block)
-    end
-    
-    def run(object, &block)
-      if block
-        messages.inject { |msg| yield msg.send_to(object) }
-      else
-        messages.inject { |msg| msg.send_to(object) }
-      end
-    end
-  end
-
 end # Buildr
 
