@@ -211,6 +211,10 @@ module Buildr
       end
     end
 
+    def context #:nodoc:
+      @context ||= Context.new
+    end
+
     # The user interface.
     # Currently Buildr only runs on command line
     def iface # :nodoc:
@@ -317,7 +321,10 @@ module Buildr
 
     def load_buildfile #:nodoc:
       info "(in #{Dir.pwd}, #{environment})"
-      load File.expand_path(@rakefile) if @rakefile != ''
+      unless @rakefile.to_s.empty?
+        path = File.expand_path(@rakefile)
+        context.instance_eval File.read(path), path
+      end
       buildfile.enhance @requires.select { |f| File.file?(f) }.map{ |f| File.expand_path(f) }
     end
 
@@ -379,6 +386,11 @@ module Buildr
       end
     end
     
+  end
+
+  # The application context to evaluate the buildfile on.
+  class Context #:nodoc:
+    include Buildr
   end
   
   
