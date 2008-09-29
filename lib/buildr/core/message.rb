@@ -49,15 +49,15 @@ module Buildr
     class << self
       
       def before(*args, &block)
-        register(Before, caller.first, *args, &block)
+        register(Before, caller.first.split(':')[0,2].join(':'), *args, &block)
       end
       
       def after(*args, &block)
-        register(After, caller.first, *args, &block)
+        register(After, caller.first.split(':')[0,2].join(':'), *args, &block)
       end
       
       def around(*args, &block)
-        register(Around, caller.first, *args, &block)
+        register(Around, caller.first.split(':')[0,2].join(':'), *args, &block)
       end
       
       def instances
