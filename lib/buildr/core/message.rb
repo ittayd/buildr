@@ -17,30 +17,45 @@ module Buildr
   
   # Helper for lazy method application.
   class Message < Struct.new(:name, :args, :block) # :nodoc:
+
     def send_to(object)
       object.send(name, *args, &block)
     end
+
+    alias_method :call, :send_to
+    
     def to_proc
       lambda { |object| send_to(object) }
     end
+
   end
 
   class MessageChain < BasicObject #:nodoc:
+
     def messages
       @messages ||= []
     end
 
+    def <<(callable)
+      raise "Expected #{callable} to respond to :call" unless callable.respond_to?(:call)
+      messages << callable
+    end
+
     def method_missing(name, *args, &block)
-      messages << Message.new(name, args, &block)
+      messages << Message.new(name, args, block)
+      self
     end
     
     def send_to(object, &block)
-      messages.map { |msg| block ? block.call(msg.send_to(object)) : msg.send_to(object) }
+      messages.map { |msg| block ? block.call(msg.call(object)) : msg.call(object) }
     end
+
+    alias_method :call, :send_to
 
     def to_proc
       lambda { |object| send_to(object) }
     end
+
   end
   
   # This class helps to create advices before/after/around already existing methods.
@@ -48,16 +63,34 @@ module Buildr
     
     class << self
       
-      def before(*args, &block)
-        register(Before, caller.first.split(':')[0,2].join(':'), *args, &block)
+      # Define a before advice for a message on a given module
+      def before(target_module, message_name, &block)
+        register(Before, target_module, message_name, &block)
       end
       
-      def after(*args, &block)
-        register(After, caller.first.split(':')[0,2].join(':'), *args, &block)
+      # Define an after advice for a message on a given module
+      def after(target_module, message_name, &block)
+        register(After, target_module, message_name, &block)
       end
       
-      def around(*args, &block)
-        register(Around, caller.first.split(':')[0,2].join(':'), *args, &block)
+      # Define an around advice for a message on a given module
+      def around(target_module, message_name, &block)
+        register(Around, target_module, message_name, &block)
+      end
+
+      # Define a before advice on the metaclass of target_instance for message
+      def before!(target_instance, message_name, &block)
+        register(Before, class << target_instance; self; end, message_name, &block)
+      end
+      
+      # Define an after advice on the metaclass of target_instance for message
+      def after!(target_instance, message_name, &block)
+        register(After, class << target_instance; self; end, message_name, &block)
+      end
+      
+      # Define an around advice on the metaclass of target_instance for message
+      def around!(target_instance, message_name, &block)
+        register(Around, class << target_instance; self; end, message_name, &block)
       end
       
       def instances
@@ -66,18 +99,18 @@ module Buildr
 
     private
 
-      def register(type, location, target, message_name, on_singleton = false, &block) #:nodoc:
+      def register(type, target, message_name, &block) #:nodoc:
         time = Time.now
-        target = class << target; self; end if on_singleton
         meth = target.instance_method(message_name)
+        location = caller[1].split(':')[0,2].join(':')
         advice_name = [nil, type.name, target.object_id, time.to_i, time.usec, location]
         advice_name = advice_name.join('__').intern
-        advice = Advice.new(advice_name, type, &block)
+        advice = Advice.new(advice_name, type, target, message_name, &block)
         instances[advice_name] = advice
         target.module_eval <<-RUBY
           alias_method :'#{advice_name}', :'#{message_name}'
           def #{message_name}(*args, &block)
-            Advice.instances[:'#{advice_name}'].run(self, Message.new(:'#{message_name}', args, block))
+            Advice.instances[:'#{advice_name}'].run(self, *args, &block)
           end
         RUBY
         advice
@@ -86,29 +119,23 @@ module Buildr
 
     module Before
       def execute
-        @result = block.call(self) if block
-        chain.send_to(target) { |res| @result = res }
-        @result = target.send(name, *message.args, &message.block)
+        run_hooks
+        continue
+        @result
       end
     end
     
     module After
       def execute
-        @result = target.send(name, *message.args, &message.block)
-        @result = block.call(self) if block
-        chain.send_to(target) { |res| @result = res }
+        continue
+        run_hooks
         @result
       end
     end
 
     module Around
-      def continue
-        @result = target.send(name, *message.args, &message.block)
-      end
-      
       def execute
-        @result = block.call(self) if block
-        chain.send_to(target) { |res| @result = res }
+        run_hooks
         @result
       end
     end
@@ -127,8 +154,8 @@ module Buildr
       throw @name, value
     end
     
-    def run(target, message) #:nodoc:
-      catch(name) { Advice.new(name, advice_type, target, message, chain, &block).execute }
+    def run(target, *args, &proc) #:nodoc:
+      catch(name) { Advice.new(name, advice_type, target, Message.new(message, args, proc), chain, &block).execute }
     end
     
     def before?
@@ -141,6 +168,17 @@ module Buildr
     
     def around?
       Around === self
+    end
+
+    def run_hooks
+      @result = block.call(self) if block
+      chain.send_to(target) { |res| @result = res }
+    end
+
+    def continue(args = nil, &block)
+      args ||= message.args
+      block ||= message.block
+      @result = target.send(name, *args, &block) if message && message.name
     end
 
   end
