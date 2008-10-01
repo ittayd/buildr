@@ -38,8 +38,8 @@
 require 'highline/import'
 require 'rake'
 require 'rubygems/source_info_cache'
+require 'buildr/core/rake_ext'
 require 'buildr/core/application_cli'
-require 'buildr/core/util'
 
 
 # Gem::user_home is nice, but ENV['HOME'] lets you override from the environment.
