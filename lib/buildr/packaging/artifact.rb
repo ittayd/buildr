@@ -198,14 +198,15 @@ module Buildr
     include ActsAsArtifact
 
     class << self
+      
+      include Context.accessor(:defined_artifacts, :private, false) { Hash.new }
 
       # :call-seq:
       #   lookup(spec) => Artifact
       #
       # Lookup a previously registered artifact task based on its specification (String or Hash).
       def lookup(spec)
-        @artifacts ||= {}
-        @artifacts[to_spec(spec)]
+        defined_artifacts[to_spec(spec)]
       end
 
       # :call-seq:
@@ -213,8 +214,7 @@ module Buildr
       #
       # Returns an array of specs for all the registered artifacts. (Anything created from artifact, or package).
       def list
-        @artifacts ||= {}
-        @artifacts.keys
+        defined_artifacts.keys
       end
 
       # :call-seq:
@@ -222,10 +222,9 @@ module Buildr
       #
       # Register an artifact task(s) for later lookup (see #lookup).
       def register(*tasks)
-        @artifacts ||= {}
         fail 'You can only register an artifact task, one of the arguments is not a Task that responds to to_spec' unless
           tasks.all? { |task| task.respond_to?(:to_spec) && task.respond_to?(:invoke) }
-        tasks.each { |task| @artifacts[task.to_spec] = task }
+        tasks.each { |task| defined_artifacts[task.to_spec] = task }
         tasks
       end
 
@@ -416,7 +415,8 @@ module Buildr
   #   repositories.remote << 'http://example.com/repo'
   #   repositories.release_to = 'sftp://example.com/var/www/public/repo'
   class Repositories
-    include Singleton
+    
+    extend Context.accessor(:instance, :public, false) { Repositories.new }
 
     # :call-seq:
     #   local => path
