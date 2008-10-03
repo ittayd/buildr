@@ -15,6 +15,8 @@
 
 
 require File.join(File.dirname(__FILE__), '../spec_helpers')
+Sandbox.without_context { require 'buildr/scala' }
+
 
 # TODO's
 #  -test w/ Specs

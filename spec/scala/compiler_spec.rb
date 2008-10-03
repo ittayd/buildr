@@ -15,7 +15,7 @@
 
 
 require File.join(File.dirname(__FILE__), '../spec_helpers')
-
+Sandbox.without_context { require 'buildr/scala' }
 
 describe 'scalac compiler' do
   it 'should identify itself from source directories' do

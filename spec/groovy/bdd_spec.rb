@@ -13,8 +13,9 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-require File.join(File.dirname(__FILE__), '../spec_helpers')
 
+require File.join(File.dirname(__FILE__), '../spec_helpers')
+Sandbox.without_context { require 'buildr/groovy' }
 
 describe Buildr::Groovy::EasyB do
   

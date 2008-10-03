@@ -15,16 +15,12 @@
 
 
 require File.join(File.dirname(__FILE__), 'test_coverage_spec')
-Sandbox.require_addon 'buildr/emma'
-
+Sandbox.without_context { require 'buildr/emma' }
 
 Buildr::Emma::requires
 
-
 describe Buildr::Emma do
   before do
-    # Reloading the addon because the sandbox removes all its actions
-    load File.expand_path('../addon/buildr/emma.rb')
     @tool_module = Buildr::Emma
   end
 
