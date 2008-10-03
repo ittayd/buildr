@@ -34,6 +34,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+
 module Rake #:nodoc
   
   def self.application
@@ -75,35 +76,31 @@ module Rake #:nodoc
   module RakeMethods #:nodoc:
     [ :task, :file, :file_create, :directory,
       :multitask, :namespace, :rule, :desc, :import 
-    ].each { |n| define_method "rake_#{n}", Object.instance_method(n) }
+    ].each { |n| define_method n, Object.instance_method(n) }
       
     def self.remove_from(mod)
-      instance_methods(false).each { |n| mod.send :remove_method, n.sub('rake_','') }
+      instance_methods(false).each { |n| mod.send :remove_method, n }
     end
   end # RakeMethods
 
 end # Rake
 
-module Buildr
-  
-  module RakeMethods #:nodoc:
-    include Rake::RakeMethods
-    
-    Rake::RakeMethods.instance_methods(false).each do |name|
-      module_eval <<-RUBY, __FILE__, 1+__LINE__
-        private :#{name}
-        def #{name.sub('rake_','')}(*args, &block)
-          Context.execute Message.new(:#{name}, args, block)
-        end
-      RUBY
-    end
+module Buildr #:nodoc:
 
+  module RakeMethods
+    
+    rake_methods = Object.new.extend Rake::RakeMethods
+    Rake::RakeMethods.instance_methods(false).each do |name|
+      Message.define(self, name) do |obj, msg|
+        Application.apply_or_defer { msg.call rake_methods }
+      end
+    end
+    
   end # RakeMethods
   
 end # Buildr
 
-class Object
+class Object #:nodoc:
   Rake::RakeMethods.remove_from(self)
   include Buildr::RakeMethods
 end
-
