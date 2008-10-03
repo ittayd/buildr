@@ -93,7 +93,8 @@ module Buildr
   private
 
     def load_from(base_name, dir = nil)
-      base_name = File.expand_path(base_name, dir) if dir
+      dir ||= @application.original_dir
+      base_name = File.expand_path(base_name, dir)
       file_name = ['yaml', 'yml'].map { |ext| "#{base_name}.#{ext}" }.find { |fn| File.exist?(fn) }
       return {} unless file_name
       yaml = YAML.load(File.read(file_name)) || {}
@@ -102,11 +103,62 @@ module Buildr
       yaml
     end
 
+  end # Settings
+
+  # This task stands for the buildfile and all its associated helper files (e.g., buildr.rb, build.yaml).
+  # By using this task as a prerequisite for other tasks, you can ensure these tasks will be needed
+  # whenever the buildfile changes.
+  class BuildfileTask < Rake::FileTask
+    def timestamp
+      ([name] + prerequisites).map { |f| File.stat(f).mtime }.max rescue Time.now
+    end
   end
 
-
   class Application < Rake::Application #:nodoc:
+    
+    # This message chain is run only once after buildr has been loaded
+    # Adding messages after that will execute them inmediatly.
+    extend MessageChain.collector(:@boot) {
+      buildr_loaded = false
+      loaded = lambda { buildr_loaded = true }
+      MessageChain.new(nil, loaded) do |child|
+        # If buildr has already loaded, clean the chain & execute child
+        if buildr_loaded
+          chain.messages.replace []
+          child.return child.call(self)
+        end
+      end
+    }
+    
+    # Create a default application when everything is ready
+    boot { Buildr.application = Application.new }
+    
+    # This message chain is run for every application as part of
+    # their initialization process (Application#init)
+    #
+    # If a message is added to this chain and we also have a current
+    # application, then the message is applied to it.
+    extend MessageChain.collector(:@init) {
+      MessageChain.new do |child|
+        # Execute inmediatly if we have a current application
+        ctx = Context.current and child.return child.call(ctx.application)
+      end
+    }
 
+    class << self
+      
+      # Apply the given messages to the currently running application
+      # or if no current application, defer until Application#init
+      def apply_or_defer(*messages, &block)
+        if ctx = Context.current
+          (messages << block).inject(nil) { |r, m| m.call(ctx.application) }
+        else
+          Application.init *messages, &block
+        end
+      end
+      
+    end
+    
     DEFAULT_BUILDFILES = ['buildfile', 'Buildfile'] + DEFAULT_RAKEFILES
     
     attr_reader :rakefiles, :requires
@@ -154,23 +206,26 @@ module Buildr
     end
 
     def run(argv = ARGV)
-      standard_exception_handling do
-        init_iface(argv)
-        find_buildfile
-        change_workdir
-        load_gems
-        load_artifacts
-        load_tasks
-        load_requires
-        load_buildfile
-        load_imports
-        task('buildr:initialize').invoke
-        top_level
+      context do
+        standard_exception_handling do
+          init
+          iface_init(argv)
+          find_buildfile
+          change_workdir
+          load_gems
+          load_artifacts
+          load_tasks
+          load_requires
+          load_buildfile
+          load_imports
+          task('buildr:initialize').invoke
+          top_level
+        end
+        title, message = 'Your build has completed', "#{Dir.pwd}\nbuildr #{@top_level_tasks.join(' ')}"
+        @on_completion.each { |block| block.call(title, message) rescue nil }
       end
-      title, message = 'Your build has completed', "#{Dir.pwd}\nbuildr #{@top_level_tasks.join(' ')}"
-      @on_completion.each { |block| block.call(title, message) rescue nil }
     end
-
+    
     # Yields to block on successful completion. Primarily used for notifications.
     def on_completion(&block)
       @on_completion << block
@@ -211,8 +266,11 @@ module Buildr
       end
     end
 
-    def context #:nodoc:
-      @context ||= Context.new
+    # Return the application context
+    def context(&block) #:nodoc:
+      @context ||= Context.new(self)
+      return @context unless block
+      @context.execute(block)
     end
 
     # The user interface.
@@ -227,13 +285,20 @@ module Buildr
     end
 
   private
-    
+
+    def init #:nodoc:
+      # set the current context as active
+      Context.current = context
+      # create tasks, extensions, etc.
+      Application.init.call self
+    end
+
     # Initialize from the application interface
-    def init_iface(argv)
+    def iface_init(argv) #:nodoc:
       iface.parse_options(argv.clone)
       collect_tasks iface.argv # collect tasks from the parsed argv
     end
-
+    
     # Collect the list of tasks on the command line.  If no tasks are
     # given, return a list containing only the default task.
     # Environmental assignments are processed at this time as well.
@@ -385,33 +450,134 @@ module Buildr
         exit(1)
       end
     end
-    
-  end
 
-  # The application context to evaluate the buildfile on.
+  end # Application
+
+  # This module helps to create and run multiple Application instances, each of them
+  # having a Context instance used evaluate the buildfile on it, so that constants 
+  # defined on a buildfile doesn't collide with constants from other.
+  # 
+  # The current application being run is determined by 
+  #   Context.current.application
+  #
+  # To avoid conflicting with other applications, instead of storing globals or
+  # module instance variables, you can use the context as a state handler for each app.
+  # See the documentation for the accessor method.
   class Context #:nodoc:
     include Buildr
-  end
-  
-  
-  # This task stands for the buildfile and all its associated helper files (e.g., buildr.rb, build.yaml).
-  # By using this task as a prerequisite for other tasks, you can ensure these tasks will be needed
-  # whenever the buildfile changes.
-  class BuildfileTask < Rake::FileTask
     
-    def timestamp
-      ([name] + prerequisites).map { |f| File.stat(f).mtime }.max rescue Time.now
-    end
-  end
+    class << self
+      attr_accessor :current
 
+      # :call-seq:
+      #   include Context.accessor(attr_name, reader = :public, writer = reader, default_value)
+      #   include Context.accessor(attr_name, reader = :public, writer = reader) { DefaultValue.new }
+      #  
+      # Return a module with context sentitive accessor methods, values are accessed from
+      # the current context object. 
+      #
+      # First argument is the attribute name to generate accessors for.
+      # Second and third arguments are the visibility for the reader and writer methods respectively,
+      # you can set any of them to false to skip generating the reader or writer method.
+      # Third argument specifies the default attribute value, or if a block is given it will be called
+      # the obtain the default value the first time the reader method is called.
+      # 
+      # The following example from the Buildr::Logger module, illustrates usage:
+      #
+      #   module Logger
+      #     extend Context.accessor(:instance) { CommandLineInterface::Logger.new }
+      #     Application.init { |app| Logger.instance = app.iface.logger }
+      #   end
+      #
+      # The Logger.instance method will return the logger for the current application,
+      # when a new application is initialized, its iface.logger is set for on application context.
+      # This way applications can use different loggers, accessed by the same interface.
+      def accessor(attribute, readable = :public, writable = readable, default_value = nil, &block) #:nodoc:
+        writable = [:public, :protected, :private].include?(writable) ? writable : nil
+        readable = [:public, :protected, :private].include?(readable) ? readable : nil
+        raise ArgumentError, 'No valid visibility for reader and writer' unless readable || writable
+        Module.new do |mod|
+          Message.define(mod, attribute, readable) do |obj, msg|
+            ctx = Context.current
+            raise 'No current Buildr::Context' unless ctx
+            ctx.state[[obj, attribute]] ||= default_value || block.call(obj, attribute)
+          end if readable
+          Message.define(mod, attribute.to_s + '=', writable) do |obj, msg|
+            ctx = Context.current
+            raise 'No current Buildr::Context' unless ctx
+            ctx.state[[obj, attribute]] = msg.args.first
+          end if writable
+        end
+      end
+    end
+
+    # The state holder for Context accessors
+    attr_reader :state
+
+    def initialize(app)
+      @application = app
+      @state = Hash.new
+    end
+
+    # Return the application for this context.
+    # The currently running application can be obtained with
+    #    Context.current.application
+    def application
+      @application
+    end
+
+    # TODO: replace with a thread safe version so that we can
+    # execute several buildr instances at the same time
+    def execute(block)
+      old, Context.current = Context.current, self
+      begin
+        block.call(self)
+      ensure
+        Context.current = old
+      end
+    end
+
+    def inspect #:nodoc:
+      %Q{context(#{application})}
+    end
+    
+  end # Context
+
+  # Mixin for objects requiring log output
+  #    include Buildr::Logger
+  #    def some; trace('Trace this'); end
+  # Or
+  #    def some; Buildr::Logger.trace('Trace that'); end
+  module Logger #:nodoc:
+    extend self
+    
+    extend Context.accessor(:instance) { CommandLineInterface::Logger.new }
+    Application.init { |app| Logger.instance = app.iface.logger }
+      
+    [ :warn_without_color, :warn, :error, :info, :trace ].each do |name|
+      Message.define(self, name) { |obj, msg| msg.call Logger.instance }
+    end
+
+    # Add logging methods into the top level object.
+    # I'd prefer to include Logger only on those needing it.
+    # or having them to call methods on Buildr::Logger
+    Application.boot do
+      instance_methods(false).each do |name|
+        eval("def #{name}(*a, &b); Buildr::Logger.#{name}(*a, &b); end", TOPLEVEL_BINDING)
+      end
+    end
+  end # Logger
 
   class << self
 
-    task 'buildr:initialize' do
-      Buildr.load_tasks_and_local_files
+    Application.init do
+      task 'buildr:initialize' do
+        # Is this method actually used?
+        # Buildr.load_tasks_and_local_files
+      end
     end
 
-    # Returns the Buildr::Application object.
+    # Returns the currently running Buildr::Application object.
     def application
       Rake.application
     end
@@ -431,11 +597,8 @@ module Buildr
     end
 
   end
-
-  Buildr.application = Buildr::Application.new
-
-end
-
+  
+end # Buildr
 
 # Add a touch of color when available and running in terminal.
 if $stdout.isatty
@@ -470,70 +633,12 @@ if $stdout.isatty && verbose && RUBY_PLATFORM =~ /darwin/
           { :ApplicationName=>'Buildr', :NotificationName=>type,
             :NotificationTitle=>title, :NotificationDescription=>message }, true)
     end
-    Buildr.application.on_completion { |title, message| notify['Completed', title, message] }
-    Buildr.application.on_failure { |title, message, ex| notify['Failed', title, message] }
+    Buildr::Application.init.on_completion { |title, message| notify['Completed', title, message] }
+    Buildr::Application.init.on_failure { |title, message, ex| notify['Failed', title, message] }
   rescue Exception # No growl
   end
 elsif $stdout.isatty && verbose
   notify = lambda { |type, title, message| $stdout.puts "[#{type}] #{title}: #{message}" }
-  Buildr.application.on_completion { |title, message| notify['Completed', title, message] }
-  Buildr.application.on_failure { |title, message, ex| notify['Failed', title, message] }
-end
-
-
-alias :warn_without_color :warn
-
-# Show warning message.
-def warn(message)
-  warn_without_color $terminal.color(message.to_s, :blue) if verbose
-end
-
-# Show error message.  Use this when you need to show an error message and not throwing
-# an exception that will stop the build.
-def error(message)
-  puts $terminal.color(message.to_s, :red)
-end
-
-# Show optional information.  The message is printed only when running in verbose
-# mode (the default).
-def info(message)
-  puts message if verbose
-end
-
-# Show message.  The message is printed out only when running in trace mode.
-def trace(message)
-  puts message if Buildr.application.options.trace
-end
-
-
-module Rake #:nodoc
-  class Task #:nodoc:
-    def invoke(*args)
-      task_args = TaskArguments.new(arg_names, args)
-      invoke_with_call_chain(task_args, Thread.current[:rake_chain] || InvocationChain::EMPTY)
-    end
-
-    def invoke_with_call_chain(task_args, invocation_chain)
-      new_chain = InvocationChain.append(self, invocation_chain)
-      @lock.synchronize do
-        if application.options.trace
-          puts "** Invoke #{name} #{format_trace_flags}"
-        end
-        return if @already_invoked
-        @already_invoked = true
-        begin
-          invoke_prerequisites(task_args, new_chain)
-        rescue
-          trace "Exception while invoking prerequisites of task #{self.inspect}"
-          raise
-        end
-        begin
-          old_chain, Thread.current[:rake_chain] = Thread.current[:rake_chain], new_chain
-          execute(task_args) if needed?
-        ensure
-          Thread.current[:rake_chain] = nil
-        end
-      end
-    end
-  end
+  Buildr::Application.init.on_completion { |title, message| notify['Completed', title, message] }
+  Buildr::Application.init.on_failure { |title, message, ex| notify['Failed', title, message] }
 end
