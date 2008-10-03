@@ -257,22 +257,33 @@ module Buildr
     
     # Create a new advice.
     def initialize(on_module, name, backup = nil, enabled = true, &impl)
-      if backup
-        on_module.send :alias_method, backup, name
-        @adviced = on_module.instance_method(backup)
-      else
-        @adviced = on_module.instance_method(name)
-      end
+      on_module.send :alias_method, backup, name if backup
+      @adviced = on_module.instance_method(name)
       @on_module = on_module
       @name = name
       @impl = impl
       @enabled = !!enabled
+    end
+
+    # remove this advice, restoring the previous adviced method
+    def remove!
+      @on_module.module_eval { define_method(name, @adviced) }
     end
     
     def return(value = result)
       throw @name, value
     end
     
+    # Run the implementation block, yielding the advice, object and message
+    def run_impl(object, message)
+      @result = @impl.call(*[self, object, message])
+    end
+
+    # Run the adviced method on object with the given args and block
+    def continue(object, *args, &block)
+      @result = @adviced.bind(object).call(*args, &block)
+    end
+
     def before?
       Before === self
     end
@@ -289,18 +300,12 @@ module Buildr
       @enabled
     end
 
-    def enabled=(flag)
-      @enabled = !!flag
+    def enable!
+      @enabled = true
     end
 
-    # Run the implementation block, yielding the advice, object and message
-    def run_impl(object, message)
-      @result = @impl.call(*[self, object, message])
-    end
-
-    # Run the adviced method on object with the given args and block
-    def continue(object, *args, &block)
-      @result = @adviced.bind(object).call(*args, &block)
+    def disable!
+      @enabled = false
     end
 
   end # Advice
