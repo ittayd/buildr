@@ -19,6 +19,7 @@
 unless defined?(SpecHelpers)
 
   require 'rubygems'
+  gem 'rake', '>= 0.8.3'
   $LOAD_PATH.unshift File.expand_path('../lib', File.dirname(__FILE__)), File.expand_path('../addon', File.dirname(__FILE__))
   require 'buildr'
 
