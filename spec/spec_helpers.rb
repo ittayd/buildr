@@ -27,17 +27,16 @@ unless defined?(SpecHelpers)
 
   module SpecHelpers
 
-    include Checks::Matchers
-
-    [:info, :warn, :error].each do |severity|
-      ::Object.class_eval do
-        define_method severity do |message|
-          $messages ||= {}
-          ($messages[severity] ||= []) << message
-        end
+    # Intercept buildr logging
+    [:trace, :warn, :info, :error].each do |severity|
+      Advice.before(Buildr::Logger, severity) do |advice, object, message|
+        $messages ||= {}
+        ($messages[severity] ||= []).push *message.args
       end
     end
-    
+
+    include Buildr::Checks::Matchers
+
     class << Buildr.application
       alias :deprecated_without_capture :deprecated
       def deprecated(message)
