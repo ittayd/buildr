@@ -39,6 +39,38 @@ module Buildr
   # This class provides methods for command line interaction.
   # Handles command line arguments parsing.
   class CommandLineInterface
+
+    # The command line interface logger
+    class Logger
+
+      def initialize(out = STDOUT)
+        @out = out
+      end
+      
+      alias :warn_without_color :warn
+      
+      # Show warning message.
+      def warn(message)
+        @out.warn_without_color $terminal.color(message.to_s, :blue) if verbose
+      end
+      
+      # Show error message.  Use this when you need to show an error message and not throwing
+      # an exception that will stop the build.
+      def error(message)
+        @out.puts $terminal.color(message.to_s, :red)
+      end
+      
+      # Show optional information.  The message is printed only when running in verbose
+      # mode (the default).
+      def info(message)
+        @out.puts message if verbose
+      end
+      
+      # Show message.  The message is printed out only when running in trace mode.
+      def trace(message)
+        @out.puts message if Buildr.application.options.trace
+      end      
+    end # Logger
     
     attr_reader :app, :argv, :extra_argv
     
@@ -72,16 +104,8 @@ module Buildr
 
     # Parse the given arguments array
     def parse_options(argv)
-      argv = argv.dup
-      if idx = argv.index('--')
-        @extra_argv = argv[idx+1..-1]
-        argv = argv[0...idx]
-      end
-      while idx = (argv.index('-R') || argv.index('--require-early'))
-        raise "missing argument: --require-early" unless val = argv[idx+1]
-        argv[idx,2] = []
-        app.instance_eval { require val }
-      end
+      argv, ignored = *self.class.argv_ignored(argv)
+      self.class.require_early!(argv) { |file| app.instance_eval { require val } }
       @argv = options_parser.parse(argv)
     end
 
@@ -93,6 +117,10 @@ module Buildr
     # Return the program options string
     def help
       @parser.to_s
+    end
+
+    def logger
+      @logger ||= Logger.new
     end
 
   private
@@ -109,13 +137,16 @@ module Buildr
       parser.separator ""
       parser.separator "Options:"
       setup_buildr_options(parser)
-      @defs.each { |msg| msg.send_to(parser) }
+      @defs.each { |msg| msg.call(parser) }
       @parser = parser
     end
 
     def setup_buildr_options(parser)
       buildr_standard_options.each { |args| parser.on(*args) }
-      parser.on_tail('--require-early', '-R MODULE', 'Require MODULE on the bootstrap process.') do |value|
+      parser.on_tail('--require-early', '-R MODULE', 'Require MODULE before processing',
+                     'the rest of the command line arguments.',
+                     'Use this option to require addons that need to',
+                     'initialize the buildr application interface.') do |value|
         fail "Late to require #{value}"
       end
       parser.on_tail("-h", "--help", "Display this help message.") do
@@ -173,8 +204,35 @@ module Buildr
         }
        ],
       ]
-     end
+    end
     
+    class << self
+      
+      # Return an array of those containing arguments 
+      # before '--' and those after.
+      def argv_ignored(argv)
+        if idx = argv.index('--')
+          extra = argv[idx+1..-1]
+          argv = argv[0...idx]
+        end
+        [argv, extra]
+      end
+
+      # Return the option values for --require-early (-R).
+      # Yields each value if a block is given.
+      # Removes these options and values from argv.
+      def require_early!(argv, &block)
+        requires = []
+        while idx = (argv.index('-R') || argv.index('--require-early'))
+          raise "missing argument: --require-early" unless val = argv[idx+1]
+          argv[idx,2] = []
+          requires << val
+        end
+        requires.each(&block)
+      end
+      
+    end
+
   end # CommandLineInterface
   
 end
