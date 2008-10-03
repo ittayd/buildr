@@ -16,146 +16,261 @@
 module Buildr
   
   # Helper for lazy method application.
-  class Message < Struct.new(:name, :args, :block) # :nodoc:
-
-    def send_to(object)
-      object.send(name, *args, &block)
-    end
-
-    alias_method :call, :send_to
+  class Message # :nodoc:
+    attr_accessor :name, :args, :block
     
-    def to_proc
-      lambda { |object| send_to(object) }
+    def initialize(name, args = nil, block = nil)
+      @binding = lambda { }
+      @name, @args, @block = name, args, block
     end
 
-  end
+    # Apply this message on object
+    def call(object)
+      object.__send__(name, *args, &block)
+    end
+
+    def to_proc
+      method(:call).to_proc
+    end
+
+    def inspect
+      "#<#{self.class}@#{backtrace.first} #{name}(*#{args.inspect}, &#{block.inspect})>"
+    end
+
+    def backtrace(idx = 0)
+      eval("caller(2 + #{idx})", @binding)
+    end
+        
+    def to_s
+      inspect
+    end
+
+    class << self
+      
+      # Define a method on module.
+      # The implementation callback is yield the callee and the
+      # received Message.
+      def define(on_module, name, visibility = :public, &implementation)
+        raise "Expected implementation block" unless implementation
+        raise "Invalid visibility modifier: #{visibility}" unless 
+          [:public, :protected, :private].include? visibility
+        anon = Module.new do |anon|
+          (class << anon; self end).module_eval { define_method(:message_impl, implementation) }
+        end
+        defined_from = caller.first
+        on_module.extend anon
+        on_module.module_eval <<-RUBY, __FILE__, 1+__LINE__
+          def #{name}(*args, &block)
+            anon = ObjectSpace._id2ref(#{anon.object_id})
+            anon.message_impl(self, Message.new(:'#{name}', args, block))
+          end
+          #{visibility} :#{name}
+        RUBY
+      end
+
+    end
+
+  end # Message
 
   class MessageChain < BasicObject #:nodoc:
+    attr_accessor :parent, :messages
+    
+    def initialize(parent = nil, *messages, &block)
+      @parent, @messages, @when_added = parent, messages, block
+    end
 
-    def messages
-      @messages ||= []
+    def child_added(&block)
+      @when_added = block
+    end
+
+    def root
+      root = self
+      root = root.parent while root.parent
+      root
+    end
+    
+    # Call this method inside a child_added block to 
+    # return a value as the result for this chain.
+    def return(result = nil)
+      throw :chain_return, (result || yield)
     end
 
     def <<(callable)
-      raise "Expected #{callable} to respond to :call" unless callable.respond_to?(:call)
-      messages << callable
+      catch :chain_return do
+        chain = MessageChain.new(self, callable)
+        messages << chain
+        @when_added.call(chain) if @when_added
+        chain
+      end
     end
 
     def method_missing(name, *args, &block)
-      messages << Message.new(name, args, block)
-      self
+      self << Message.new(name, args, block)
     end
     
-    def send_to(object, &block)
-      messages.map { |msg| block ? block.call(msg.call(object)) : msg.call(object) }
+    def call(object, injected = false)
+      messages.inject(object) do |res, msg|
+        res = object unless injected
+        begin
+          res = msg.call(res)
+        rescue => e
+          e.set_backtrace MessageChain.backtrace(msg, e)
+          raise e
+        end
+        res = block_given? ? yield(res) : res
+      end
     end
-
-    alias_method :call, :send_to
 
     def to_proc
-      lambda { |object| send_to(object) }
+      method(:call).to_proc
     end
 
-  end
+    def empty?
+      messages.empty?
+    end
+
+    def inspect
+      "#<#{MessageChain} messages["+
+        @messages.map(&:inspect).join(', ')+
+        "] when_added(#{@when_added.inspect}"+
+        ')>'
+    end
+
+    def to_s
+      inspect
+    end
+    
+    class << self
+
+      def backtrace(msg, exception)
+        bt = msg.backtrace if msg.respond_to?(:backtrace)
+        bt = [Array(bt) + exception.backtrace].flatten
+        bt.reject { |trace|  trace =~ /#{__FILE__}:|^:0$/ }
+      end
+
+      def collect(object, ivar, block = nil, *messages, &creator)
+        creator ||= lambda { MessageChain.new }
+        case ivar.to_s
+        when /^@/
+          getter = lambda { object.instance_variable_get(ivar) }
+          setter = lambda { |v| object.instance_variable_set(ivar, v) }
+        when /=$/
+          getter = lambda { object[ivar] }
+          setter = lambda { |v| object[ivar] = v }
+        else
+          getter = object.method(ivar)
+          setter = object.method("#{ivar}=")
+        end
+        unless chain = getter.call
+          chain = creator.call(object, ivar)
+          setter.call(chain)
+        end
+        (messages << block).compact.inject(chain){ |a,b| a << b }
+      end
+      
+      # Return a module with methods defined for each name, those
+      # methods are used to collect messages on a message chain.
+      #
+      def collector(*names, &creator)
+        Module.new do |mod|
+          names.each do |name|
+            Message.define(mod, name.to_s.gsub(/(^@|=$)/, '')) do |obj, msg|
+              MessageChain.collect(mod, name, msg.block, *msg.args, &creator)
+            end
+          end
+        end
+      end
+      
+    end
+
+  end # MessageChain
   
   # This class helps to create advices before/after/around already existing methods.
   class Advice
     
-    class << self
+    class << self #:nodoc
       
-      # Define a before advice for a message on a given module
-      def before(target_module, message_name, &block)
-        register(Before, target_module, message_name, &block)
+      def before(*args, &block)
+        new(*args, &block).extend Before
       end
       
-      # Define an after advice for a message on a given module
-      def after(target_module, message_name, &block)
-        register(After, target_module, message_name, &block)
+      def after(*args, &block)
+        new(*args, &block).extend After
       end
       
-      # Define an around advice for a message on a given module
-      def around(target_module, message_name, &block)
-        register(Around, target_module, message_name, &block)
+      def around(*args, &block)
+        new(*args, &block).extend Around
       end
 
-      # Define a before advice on the metaclass of target_instance for message
-      def before!(target_instance, message_name, &block)
-        register(Before, class << target_instance; self; end, message_name, &block)
+      def before!(obj, *args, &block)
+        new(class << obj; self; end, *args, &block).extend Before
       end
       
-      # Define an after advice on the metaclass of target_instance for message
-      def after!(target_instance, message_name, &block)
-        register(After, class << target_instance; self; end, message_name, &block)
+      def after!(obj, *args, &block)
+        new(class << obj; self; end, *args, &block).extend After
       end
       
-      # Define an around advice on the metaclass of target_instance for message
-      def around!(target_instance, message_name, &block)
-        register(Around, class << target_instance; self; end, message_name, &block)
-      end
-      
-      def instances
-        @instances ||= {}
+      def around!(obj, *args, &block)
+        new(class << obj; self; end, *args, &block).extend Around
       end
 
-    private
+    end
 
-      def register(type, target, message_name, &block) #:nodoc:
-        time = Time.now
-        meth = target.instance_method(message_name)
-        location = caller[1].split(':')[0,2].join(':')
-        advice_name = [nil, type.name, target.object_id, time.to_i, time.usec, location]
-        advice_name = advice_name.join('__').intern
-        advice = Advice.new(advice_name, type, target, message_name, &block)
-        instances[advice_name] = advice
-        target.module_eval <<-RUBY
-          alias_method :'#{advice_name}', :'#{message_name}'
-          def #{message_name}(*args, &block)
-            Advice.instances[:'#{advice_name}'].run(self, *args, &block)
+    module Before #:nodoc:
+      def self.extended(advice)
+        Message.define(advice.on_module, advice.name) do |obj, msg|
+          catch advice.name do
+            advice.run_impl(obj, msg) if advice.enabled?
+            advice.continue(obj, *msg.args, &msg.block)
           end
-        RUBY
-        advice
+        end
       end
     end
 
-    module Before
-      def execute
-        run_hooks
-        continue
-        @result
+    module After #:nodoc:
+      def self.extended(advice)
+        Message.define(advice.on_module, advice.name) do |obj, msg|
+          catch advice.name do
+            advice.continue(obj, *msg.args, &msg.block)
+            advice.enabled? ? advice.run_impl(obj, msg) : advice.result
+          end
+        end
       end
     end
+
+    module Around #:nodoc:
+      def self.extended(advice)
+        Message.define(advice.on_module, advice.name) do |obj, msg|
+          catch(advice.name) do
+            if advice.enabled?
+              advice.run_impl(obj, msg)
+            else
+              advice.continue(obj, *msg.args, &msg.block)
+            end
+          end
+        end
+      end
+    end
+
+    attr_reader :name, :on_module
+    attr_accessor :result
     
-    module After
-      def execute
-        continue
-        run_hooks
-        @result
+    # Create a new advice.
+    def initialize(on_module, name, backup = nil, enabled = true, &impl)
+      if backup
+        on_module.send :alias_method, backup, name
+        @adviced = on_module.instance_method(backup)
+      else
+        @adviced = on_module.instance_method(name)
       end
-    end
-
-    module Around
-      def execute
-        run_hooks
-        @result
-      end
-    end
-
-    attr_reader :name, :advice_type, :message, :chain, :block, :target, :result
-    
-    def initialize(name, advice_type, target = nil, message = nil, chain = nil, &block) #:nodoc:
-      extend advice_type
-      @name, @advice_type = name, advice_type
-      @target, @message = target, message
-      @chain = chain || MessageChain.new
-      @block = block
+      @on_module = on_module
+      @name = name
+      @impl = impl
+      @enabled = !!enabled
     end
     
     def return(value = result)
       throw @name, value
-    end
-    
-    def run(target, *args, &proc) #:nodoc:
-      catch(name) { Advice.new(name, advice_type, target, Message.new(message, args, proc), chain, &block).execute }
     end
     
     def before?
@@ -170,17 +285,24 @@ module Buildr
       Around === self
     end
 
-    def run_hooks
-      @result = block.call(self) if block
-      chain.send_to(target) { |res| @result = res }
+    def enabled?
+      @enabled
     end
 
-    def continue(args = nil, &block)
-      args ||= message.args
-      block ||= message.block
-      @result = target.send(name, *args, &block) if message && message.name
+    def enabled=(flag)
+      @enabled = !!flag
     end
 
-  end
+    # Run the implementation block, yielding the advice, object and message
+    def run_impl(object, message)
+      @result = @impl.call(*[self, object, message])
+    end
+
+    # Run the adviced method on object with the given args and block
+    def continue(object, *args, &block)
+      @result = @adviced.bind(object).call(*args, &block)
+    end
+
+  end # Advice
 
 end
