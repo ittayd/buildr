@@ -74,7 +74,7 @@ module Buildr::Scala
   # * :properties  -- Hash of system properties available to the test case.
   # * :environment -- Hash of environment variables available to the test case.
   # * :java_args   -- Arguments passed as is to the JVM.
-  class ScalaTest < TestFramework::Java
+  class ScalaTest < Buildr::TestFramework::Java
 
     VERSION = '0.9.3'
 
@@ -85,7 +85,7 @@ module Buildr::Scala
       
       def dependencies
         ["org.scalatest:scalatest:jar:#{version}"] + ScalaSpecs.dependencies +
-          ScalaCheck.dependencies + JMock.dependencies
+          ScalaCheck.dependencies + Buildr::JMock.dependencies
       end  
 
       def applies_to?(project) #:nodoc:

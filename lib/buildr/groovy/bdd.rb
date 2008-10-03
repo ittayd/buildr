@@ -28,7 +28,7 @@ module Buildr::Groovy
   # * :format -- Report format :txt or :xml, default is :txt
   # * :properties -- Hash of properties passed to the test suite.
   # * :java_args -- Arguments passed to the JVM.
-  class EasyB < TestFramework::JavaBDD
+  class EasyB < Buildr::TestFramework::JavaBDD
     @lang = :groovy
     @bdd_dir = :spec
 
