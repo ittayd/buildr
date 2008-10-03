@@ -48,7 +48,7 @@ module Buildr::Groovy
   # * :target            -- Bytecode compatibility.
   # * :javac             -- Hash of options passed to the ant javac task
   #
-  class Groovyc < Compiler::Base
+  class Groovyc < Buildr::Compiler::Base
     
     # The groovyc compiler jars are added to classpath at load time,
     # if you want to customize artifact versions, you must set them on the
@@ -56,7 +56,7 @@ module Buildr::Groovy
     #      artifact_ns['Buildr::Compiler::Groovyc'].groovy = '1.5.4'
     #
     # namespace before this file is required.
-    REQUIRES = ArtifactNamespace.for(self) do |ns|
+    REQUIRES = Buildr::ArtifactNamespace.for(self) do |ns|
       ns.groovy!       'org.codehaus.groovy:groovy:jar:>=1.5.3'
       ns.commons_cli!  'commons-cli:commons-cli:jar:>=1.0'
       ns.asm!          'asm:asm:jar:>=2.2'
