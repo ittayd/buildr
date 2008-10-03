@@ -49,13 +49,9 @@ module Buildr
   #   end
   class Layout
 
-    class << self
-
-      # Default layout used by new projects.
-      attr_accessor :default
-
-    end
-
+    # Default layout used by new projects.
+    extend Context.accessor(:default) { Default.new }
+    
     def initialize #:nodoc:
       @mapping = {}
     end
@@ -100,8 +96,6 @@ module Buildr
       end
 
     end
-
-    self.default = Default.new
 
   end
 
@@ -192,35 +186,32 @@ module Buildr
       #   define(name, properties?) { |project| ... } => project
       #
       # See Buildr#define.
-      def define(name, properties, &block) #:nodoc:
+      def define(name, properties = nil, &block) #:nodoc:
         # Make sure a sub-project is only defined within the parent project,
         # to prevent silly mistakes that lead to inconsistencies (e.g.
         # namespaces will be all out of whack).
         Buildr.application.current_scope == name.split(':')[0...-1] or
           raise "You can only define a sub project (#{name}) within the definition of its parent project"
 
-        @projects ||= {}
-        raise "You cannot define the same project (#{name}) more than once" if @projects[name]
+        raise "You cannot define the same project (#{name}) more than once" if defined_projects[name]
         # Projects with names like: compile, test, build are invalid, so we have
         # to make sure the project has not the name of an already defined task
         raise "Invalid project name: #{name.inspect} is already used for a task" if Buildr.application.lookup(name)
 
         Project.define_task(name).tap do |project|
           # Define the project to prevent duplicate definition.
-          @projects[name] = project
+          defined_projects[name] = project
           # Set the project properties first, actions may use them.
           properties.each { |name, value| project.send "#{name}=", value } if properties
           # Instantiate callbacks for this project, and setup to call before/after define.
           # Don't cache list of callbacks, since project may add new callbacks.
           project.enhance do |project|
-            project.send :call_callbacks, :before_define
+            before_define.call(project)
             project.enhance do |project|
-              project.send :call_callbacks, :after_define
+              after_define.call(project)
+              project.after_define.call(project)
             end
           end
-          project.enhance do |project|
-            @on_define.each { |callback| callback[project] }
-          end if @on_define
           # Enhance the project using the definition block.
           project.enhance { project.instance_eval &block } if block
 
@@ -239,18 +230,17 @@ module Buildr
         options = args.pop if Hash === args.last
         rake_check_options options, :scope if options
         raise ArgumentError, 'Only one project name at a time' unless args.size == 1
-        @projects ||= {}
         name = args.first
         if options && options[:scope]
           # We assume parent project is evaluated.
           project = options[:scope].split(':').inject([[]]) { |scopes, scope| scopes << (scopes.last + [scope]) }.
-            map { |scope| @projects[(scope + [name]).join(':')] }.
+            map { |scope| defined_projects[(scope + [name]).join(':')] }.
             select { |project| project }.last
         end
         unless project
           # Parent project not evaluated.
-          name.split(':').tap { |parts| @projects[parts.first].invoke if parts.size > 1 }
-          project = @projects[name]
+          name.split(':').tap { |parts| defined_projects[parts.first].invoke if parts.size > 1 }
+          project = defined_projects[name]
         end
         raise "No such project #{name}" unless project
         project.invoke
@@ -264,21 +254,20 @@ module Buildr
       def projects(*names) #:nodoc:
         options = names.pop if Hash === names.last
         rake_check_options options, :scope if options
-        @projects ||= {}
         names = names.flatten
         if options && options[:scope]
           # We assume parent project is evaluated.
           if names.empty?
-            parent = @projects[options[:scope].to_s] or raise "No such project #{options[:scope]}"
-            @projects.values.select { |project| project.parent == parent }.each { |project| project.invoke }.
+            parent = defined_projects[options[:scope].to_s] or raise "No such project #{options[:scope]}"
+            defined_projects.values.select { |project| project.parent == parent }.each { |project| project.invoke }.
               map { |project| [project] + projects(:scope=>project) }.flatten.sort_by(&:name)
           else
             names.uniq.map { |name| project(name, :scope=>options[:scope]) }
           end
         elsif names.empty?
           # Parent project(s) not evaluated so we don't know all the projects yet.
-          @projects.values.each(&:invoke)
-          @projects.keys.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
+          defined_projects.values.each(&:invoke)
+          defined_projects.keys.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
         else
           # Parent project(s) not evaluated, for the sub-projects we may need to find.
           names.map { |name| name.split(':') }.select { |name| name.size > 1 }.map(&:first).uniq.each { |name| project(name) }
@@ -291,7 +280,7 @@ module Buildr
       #
       # Discard all project definitions.
       def clear
-        @projects.clear if @projects
+        defined_projects.clear
       end
 
       # :call-seq:
@@ -325,19 +314,13 @@ module Buildr
         end
       end
 
-      # *Deprecated* Check the Extension module to see how extensions are handled.
-      def on_define(&block)
-        Buildr.application.deprecated 'This method is deprecated, see Extension'
-        (@on_define ||= []) << block if block
-      end
-
       def scope_name(scope, task_name) #:nodoc:
         task_name
       end
 
       def local_projects(dir = nil, &block) #:nodoc:
         dir = File.expand_path(dir || Buildr.application.original_dir)
-        projects = @projects ? @projects.values : []
+        projects = defined_projects.values
         projects = projects.select { |project| project.base_dir == dir }
         if projects.empty? && dir != Dir.pwd && File.dirname(dir) != dir
           local_projects(File.dirname(dir), &block)
@@ -372,18 +355,24 @@ module Buildr
         project = Buildr.application.lookup('rake:' + task.to_s.gsub(/:[^:]*$/, ''))
         project if Project === project
       end
+      
+      include Context.accessor(:defined_projects, :private, false) { Hash.new }
+      include MessageChain.collector(:@before_define, :@after_define)
 
-      # Callback classes.
-      def callbacks #:nodoc:
-        @callbacks ||= []
+      # *Deprecated* Check the Extension module to see how extensions are handled.
+      def on_define(*messages, &block) #:nodoc:
+        Buildr.application.deprecated 'This method is deprecated, see Extension'
+        before_define(*messages, &block)
       end
-
+      
     end
 
 
     # Project has visibility to everything in the Buildr namespace.
     include Buildr
-
+    include MessageChain.collector(:@after_define)
+    
+    
     # The project name. For example, 'foo' for the top-level project, and 'foo:bar'
     # for its sub-project.
     attr_reader :name
@@ -399,11 +388,6 @@ module Buildr
         # dependencies (it's being invoked right now, so calling project will fail).
         @parent = task(split[0...-1].join(':'))
         raise "No parent project #{split[0...-1].join(':')}" unless @parent && Project === parent
-      end
-      callbacks = Project.callbacks.uniq.map(&:new)
-      @callbacks = [:before_define, :after_define].inject({}) do |hash, state|
-        methods = callbacks.select { |callback| callback.respond_to?(state) }.map { |callback| callback.method(state) }
-        hash.update(state=>methods)
       end
     end
 
@@ -624,16 +608,6 @@ module Buildr
       end
     end
 
-    # Call all callbacks for a particular state, e.g. :before_define, :after_define.
-    def call_callbacks(state) #:nodoc:
-      methods = @callbacks.delete(state) || []
-      methods.each { |method| method.call(project) }
-    end
-
-    def add_callback(callback)
-      @callbacks[:after_define] << callback.method(:after_define) if callback.respond_to?(:after_define)
-    end
-
   end
 
 
@@ -714,48 +688,41 @@ module Buildr
 
       def included(base) #:nodoc:
         # When included in Project, add callback and call first_time.
-        if Project == base && !base.callbacks.include?(callbacks)
-          base.callbacks << callbacks
-          callbacks.first_time if callbacks.respond_to?(:first_time)
+        if Project == base
+          base.before_define before_define
+          base.after_define after_define
+          Application.init { first_time.call(self) }
         end
       end
 
       def extended(base) #:nodoc:
         # When extending project, add instance and call before_define.
         if Project === base
-          callbacks = self.send(:callbacks).new
-          callbacks.before_define(base) if callbacks.respond_to?(:before_define)
-          base.send :add_callback, callbacks
+          base.after_define after_define
+          before_define.call base
         end
       end
 
       # This block will be called once for any particular extension.
       # You can use this to setup top-level and local tasks.
-      def first_time(&block)
-        meta = class << callbacks ; self ; end
-        meta.send :define_method, :first_time, &block
+      def first_time(*messages, &block)
+        MessageChain.collect(self, :@first_time, block, *messages)
       end
 
       # This block is called once for the project with the project instance,
       # right before running the project definition.  You can use this to add
       # tasks and set properties that will be used in the project definition.
-      def before_define(&block)
-        callbacks.send :define_method, :before_define, &block
+      def before_define(*messages, &block)
+        MessageChain.collect(self, :@before_define, block, *messages)
       end
 
       # This block is called once for the project with the project instance,
       # right after running the project definition.  You can use this to do
       # any post-processing that depends on the project definition.
-      def after_define(&block)
-        callbacks.send :define_method, :after_define, &block
+      def after_define(*messages, &block)
+        MessageChain.collect(self, :@after_define, block, *messages)
       end
-
-    private
-
-      def callbacks
-        const_get('Callbacks') rescue const_set('Callbacks', Class.new)
-      end
-
+      
     end
 
   end
