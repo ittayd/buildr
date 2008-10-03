@@ -22,14 +22,18 @@ require 'buildr/packaging'
 require 'buildr/java'
 require 'buildr/ide'
 
+# Prevent RSpec runner from running at_exit.
+require 'spec'
+
 # Methods defined in Buildr are both instance methods (e.g. when included in Project)
 # and class methods when invoked like Buildr.artifacts().
 module Buildr ; extend self ; end
+
 # The Buildfile object (self) has access to all the Buildr methods and constants.
 class << self ; include Buildr ; end
 class Object #:nodoc:
   Buildr.constants.each { |c| const_set c, Buildr.const_get(c) unless const_defined?(c) }
 end
 
-# Prevent RSpec runner from running at_exit.
-require 'spec'
+# Everything is loaded, run the boot message chain
+Buildr::Application.boot.call self
