@@ -81,7 +81,7 @@ module Buildr::Groovy
       end
     end
     
-    Java.classpath << dependencies
+    Java.classpath << lambda { dependencies }
     
     specify :language => :groovy, :sources => [:groovy, :java], :source_ext => [:groovy, :java], 
             :target => 'classes', :target_ext => 'class', :packaging => :jar

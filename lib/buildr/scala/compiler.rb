@@ -49,7 +49,7 @@ module Buildr::Scala
     end
 
     OPTIONS = [:warnings, :deprecation, :optimise, :target, :debug, :other]
-    Java.classpath << dependencies
+    Java.classpath << lambda { dependencies }
 
     specify :language=>:scala, :target=>'classes', :target_ext=>'class', :packaging=>:jar
 
