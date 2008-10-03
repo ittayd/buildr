@@ -526,7 +526,7 @@ describe "Extension using ArtifactNamespace" do
           include Buildr::Extension
           def example; @example ||= A::Example.new; end
           before_define do |p|
-            Rake::Task.define_task('example') { p.example.doit }
+            task('example') { p.example.doit }
           end
         end
         
@@ -626,7 +626,7 @@ describe "Extension using ArtifactNamespace" do
           task('setup') do
             example.options.xmlbeans = '3.1415'
           end
-          task('run' => [:setup, :example])
+          task('run' => [:setup, Buildr.application["#{project.name}:example"]])
         end
         define 'baz' do
           extend A::Example::Ext

@@ -327,13 +327,17 @@ describe Project, '#on_define' do
   end
 
   it 'should be called with project object' do
-    Project.on_define { |project| project.name.should eql('foo') }
+    name = nil
+    Project.on_define { |project| name = project.name }
     define('foo')
+    name.should eql('foo')
   end
 
   it 'should be called with project object and set properties' do
-    Project.on_define { |project| project.version.should eql('2.0') }
+    version = nil
+    Project.on_define { |project| version = project.version }
     define('foo', :version=>'2.0')
+    version.should eql('2.0')
   end
 
   it 'should execute in namespace of project' do
@@ -358,8 +362,10 @@ describe Project, '#on_define' do
   end
 
   it 'should accept enhancement and call it with project' do
-    Project.on_define { |project| project.enhance { |project| project.name.should eql('foo') } }
+    name = nil
+    Project.on_define { |project| project.enhance { |project| name = project.name } }
     define('foo')
+    name.should eql('foo')
   end
 
   it 'should execute enhancement in namespace of project' do
@@ -598,27 +604,30 @@ describe Rake::Task, ' local directory' do
   end
 
   it 'should execute project in local directory' do
-    define 'foo'
+    Buildr.define 'foo'
     @task.should_receive(:from).with('foo')
+    project('foo')
     @task.invoke
   end
 
   it 'should execute sub-project in local directory' do
+    Buildr.define('foo') { define 'bar' }
     @task.should_receive(:from).with('foo:bar')
-    define('foo') { define 'bar' }
     in_original_dir(project('foo:bar').base_dir) { @task.invoke }
   end
 
   it 'should do nothing if no project in local directory' do
     @task.should_not_receive(:from)
-    define('foo') { define 'bar' }
+    Buildr.define('foo') { define 'bar' }
+    project('foo')
     in_original_dir('../not_foo') { @task.invoke }
   end
 
   it 'should find closest project that matches current directory' do
     mkpath 'bar/src/main'
-    define('foo') { define 'bar' }
+    Buildr.define('foo') { define 'bar' }
     @task.should_receive(:from).with('foo:bar')
+    project('foo')
     in_original_dir('bar/src/main') { @task.invoke }
   end
 end

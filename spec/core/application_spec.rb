@@ -30,10 +30,10 @@ describe Buildr::Application do
   end
 
   describe '#run' do
-    it 'should execute *_load methods in order' do
-      last = nil
-      order = [:init_iface, :find_buildfile, :change_workdir, :load_gems, :load_artifacts, :load_tasks,
-               :load_requires, :load_buildfile, :load_imports, :top_level]
+    it 'should execute methods in order' do
+      order = [:init, :iface_init, :find_buildfile, :change_workdir, 
+               :load_gems, :load_artifacts, :load_tasks, :load_requires, 
+               :load_buildfile, :load_imports, :top_level]
       order.each { |method| Buildr.application.should_receive(method).ordered }
       Buildr.application.stub!(:exit) # With this, shows the correct error instead of SystemExit.
       Buildr.application.run
@@ -52,7 +52,7 @@ describe Buildr::Application do
 
     it 'should set environment name from -e argument' do
       app = Buildr::Application.new
-      app.send :init_iface, ['-e', 'test']
+      app.send :iface_init, ['-e', 'test']
       app.environment.should eql('test')
       ENV['BUILDR_ENV'].should eql('test')
     end
