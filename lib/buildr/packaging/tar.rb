@@ -14,10 +14,6 @@
 # the License.
 
 
-require 'buildr/packaging/zip'
-require 'archive/tar/minitar'
-
-
 module Buildr
 
   # The TarTask creates a new Tar file. You can include any number of files and and directories,
@@ -82,23 +78,24 @@ module Buildr
 
   end
 
+  # :call-seq:
+  #    tar(file) => TarTask
+  #
+  # The TarTask creates a new Tar file. You can include any number of files and
+  # and directories, use exclusion patterns, and include files into specific
+  # directories.
+  #
+  # To create a GZipped Tar, either set the gzip option to true, or use the .tgz or .gz suffix.
+  #
+  # For example:
+  #   tar("test.tgz").tap do |tgz|
+  #     tgz.include "srcs"
+  #     tgz.include "README", "LICENSE"
+  #   end
+  def tar(file)
+    TarTask.define_task(file)
+  end
+
 end
 
 
-# :call-seq:
-#    tar(file) => TarTask
-#
-# The TarTask creates a new Tar file. You can include any number of files and
-# and directories, use exclusion patterns, and include files into specific
-# directories.
-#
-# To create a GZipped Tar, either set the gzip option to true, or use the .tgz or .gz suffix.
-#
-# For example:
-#   tar("test.tgz").tap do |tgz|
-#     tgz.include "srcs"
-#     tgz.include "README", "LICENSE"
-#   end
-def tar(file)
-  TarTask.define_task(file)
-end

@@ -34,6 +34,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+require 'rake'
 
 module Rake #:nodoc
   
@@ -88,16 +89,14 @@ end # Rake
 module Buildr #:nodoc:
 
   module RakeMethods
-    
+
     rake_methods = Object.new.extend Rake::RakeMethods
-    Rake::RakeMethods.instance_methods(false).each do |name|
-      Message.define(self, name) do |obj, msg|
-        Application.apply_or_defer { msg.call rake_methods }
-      end
+    Message.define(self, Rake::RakeMethods.instance_methods(false)) do |obj, msg|
+      Application.apply_or_defer { msg.call rake_methods }
     end
     
   end # RakeMethods
-  
+
 end # Buildr
 
 class Object #:nodoc:

@@ -34,13 +34,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
 require 'highline/import'
-require 'rake'
-require 'rubygems/source_info_cache'
-require 'buildr/core/rake_ext'
-require 'buildr/core/application_cli'
-
 
 # Gem::user_home is nice, but ENV['HOME'] lets you override from the environment.
 ENV["HOME"] ||= File.expand_path(Gem::user_home)
@@ -150,11 +144,7 @@ module Buildr
       # Apply the given messages to the currently running application
       # or if no current application, defer until Application#init
       def apply_or_defer(*messages, &block)
-        if ctx = Context.current
-          (messages << block).inject(nil) { |r, m| m.call(ctx.application) }
-        else
-          Application.init *messages, &block
-        end
+        Application.init *messages, &block
       end
       
     end
@@ -366,7 +356,7 @@ module Buildr
       unless rakefile
         error = "No Buildfile found (looking for: #{rakefiles.join(', ')})"
         if STDIN.isatty
-          task('generate').invoke
+          self['generate'].invoke
           exit 1
         else
           raise error

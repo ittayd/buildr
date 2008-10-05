@@ -50,7 +50,7 @@ module Buildr
       # Define a method on module.
       # The implementation callback is yield the callee and the
       # received Message.
-      def define(on_module, name, visibility = :public, &implementation)
+      def define(on_module, names, visibility = :public, &implementation)
         raise "Expected implementation block" unless implementation
         raise "Invalid visibility modifier: #{visibility}" unless 
           [:public, :protected, :private].include? visibility
@@ -59,13 +59,15 @@ module Buildr
         end
         defined_from = caller.first
         on_module.extend anon
-        on_module.module_eval <<-RUBY, __FILE__, 1+__LINE__
-          def #{name}(*args, &block)
-            anon = ObjectSpace._id2ref(#{anon.object_id})
-            anon.message_impl(self, Message.new(:'#{name}', args, block))
-          end
-          #{visibility} :#{name}
-        RUBY
+        Array(names).flatten.compact.each do |name|
+          on_module.module_eval <<-RUBY, __FILE__, 1+__LINE__
+            def #{name}(*args, &block)
+              anon = ObjectSpace._id2ref(#{anon.object_id})
+              anon.message_impl(self, Message.new(:'#{name}', args, block))
+            end
+            #{visibility} :#{name}
+          RUBY
+        end
       end
 
     end
@@ -76,11 +78,11 @@ module Buildr
     attr_accessor :parent, :messages
     
     def initialize(parent = nil, *messages, &block)
-      @parent, @messages, @when_added = parent, messages, block
+      @parent, @messages, @when_added = parent, messages, Array(block)
     end
 
     def child_added(&block)
-      @when_added = block
+      @when_added << block
     end
 
     def root
@@ -99,7 +101,7 @@ module Buildr
       catch :chain_return do
         chain = MessageChain.new(self, callable)
         messages << chain
-        @when_added.call(chain) if @when_added
+        @when_added.each { |cb| cb.call(chain) }
         chain
       end
     end
@@ -191,64 +193,57 @@ module Buildr
     class << self #:nodoc
       
       def before(*args, &block)
-        new(*args, &block).extend Before
+        define(Before, *args, &block)
       end
       
       def after(*args, &block)
-        new(*args, &block).extend After
+        define(After, *args, &block)
       end
       
       def around(*args, &block)
-        new(*args, &block).extend Around
+        define(Around, *args, &block)
       end
 
       def before!(obj, *args, &block)
-        new(class << obj; self; end, *args, &block).extend Before
+        define(Before, class << obj; self; end, *args, &block)
       end
       
       def after!(obj, *args, &block)
-        new(class << obj; self; end, *args, &block).extend After
+        define(After, class << obj; self; end, *args, &block)
       end
       
       def around!(obj, *args, &block)
-        new(class << obj; self; end, *args, &block).extend Around
+        define(Around, class << obj; self; end, *args, &block)
+      end
+
+    private
+      def define(type, *args, &block)
+        new(*args, &block).tap { |adv| adv.extend(type); adv.install! if adv.enabled? }
       end
 
     end
 
     module Before #:nodoc:
-      def self.extended(advice)
-        Message.define(advice.on_module, advice.name) do |obj, msg|
-          catch advice.name do
-            advice.run_impl(obj, msg) if advice.enabled?
-            advice.continue(obj, *msg.args, &msg.block)
-          end
+      def advice_impl(obj, msg)
+        catch(:advice_result) do 
+          run_impl(obj, msg) if enabled?
+          continue(obj, *msg.args, &msg.block)
         end
       end
     end
 
     module After #:nodoc:
-      def self.extended(advice)
-        Message.define(advice.on_module, advice.name) do |obj, msg|
-          catch advice.name do
-            advice.continue(obj, *msg.args, &msg.block)
-            advice.enabled? ? advice.run_impl(obj, msg) : advice.result
-          end
+      def advice_impl(obj, msg)
+        catch(:advice_result) do
+          continue(obj, *msg.args, &msg.block)
+          enabled? ? run_impl(obj, msg) : result
         end
       end
     end
 
     module Around #:nodoc:
-      def self.extended(advice)
-        Message.define(advice.on_module, advice.name) do |obj, msg|
-          catch(advice.name) do
-            if advice.enabled?
-              advice.run_impl(obj, msg)
-            else
-              advice.continue(obj, *msg.args, &msg.block)
-            end
-          end
-        end
+      def advice_impl(obj, msg)
+        catch(:advice_result) { enabled? ? run_impl(obj, msg) : continue(obj, *msg.args, &msg.block) }
       end
     end
 
@@ -265,13 +260,31 @@ module Buildr
       @enabled = !!enabled
     end
 
+    def installed?
+      @installed
+    end
+
+    # replace the adviced method with this advice implementation.
+    def install!
+      return if installed?
+      Message.define(on_module, name, &method(:advice_impl))
+      @installed = enable!
+    end
+
     # remove this advice, restoring the previous adviced method
     def remove!
-      @on_module.module_eval { define_method(name, @adviced) }
+      return unless installed?
+      adviced = @adviced
+      name = @name
+      @on_module.module_eval do 
+        remove_method name
+        define_method name, adviced
+      end
+      @installed = disable!
     end
     
     def return(value = result)
-      throw @name, value
+      throw :advice_result, value
     end
     
     # Run the implementation block, yielding the advice, object and message

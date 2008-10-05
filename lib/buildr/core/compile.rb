@@ -14,9 +14,6 @@
 # the License.
 
 
-require 'buildr/core/common'
-
-
 module Buildr
 
   # The underlying compiler used by CompileTask.
@@ -484,7 +481,7 @@ module Buildr
       resources.send :associate_with, project, :main
       project.path_to(:source, :main, :resources).tap { |dir| resources.from dir if File.exist?(dir) }
 
-      compile = CompileTask.define_task('compile'=>resources)
+      compile = Buildr.application.define_task(CompileTask, 'compile'=>resources)
       compile.send :associate_with, project, :main
       project.recursive_task('compile')
     end
@@ -566,7 +563,7 @@ module Buildr
 
   end
 
-
+  
   class Options
 
     # Returns the debug option (environment variable DEBUG).

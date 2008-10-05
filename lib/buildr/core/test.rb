@@ -14,11 +14,6 @@
 # the License.
 
 
-require 'buildr/core/project'
-require 'buildr/core/build'
-require 'buildr/core/compile'
-
-
 module Buildr
 
   # The underlying test framework used by TestTask.

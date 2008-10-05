@@ -14,13 +14,6 @@
 # the License.
 
 
-require 'buildr/core/project'
-require 'buildr/packaging/zip'
-#require 'test/unit'
-require 'spec/matchers'
-require 'spec/expectations'
-
-
 module Buildr
   # Methods added to Project to allow checking the build.
   module Checks
@@ -284,7 +277,6 @@ module Zip #:nodoc:
 
   end
 end
-
 
 class Buildr::ArchiveTask
 

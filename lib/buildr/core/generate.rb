@@ -14,9 +14,6 @@
 # the License.
 
 
-require 'buildr/java/pom'
-
-
 module Buildr
   module Generate #:nodoc:
 
@@ -193,3 +190,4 @@ EOF
     end
   end
 end 
+

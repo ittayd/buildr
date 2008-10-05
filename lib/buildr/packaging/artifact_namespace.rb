@@ -14,9 +14,6 @@
 # the License.
 
 
-require 'buildr/java/version_requirement'
-
-
 module Buildr
   
   # An ArtifactNamespace is a hierarchical dictionary used to manage ArtifactRequirements.

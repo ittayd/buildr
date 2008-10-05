@@ -51,7 +51,7 @@ module Buildr
       
       # Show warning message.
       def warn(message)
-        @out.warn_without_color $terminal.color(message.to_s, :blue) if verbose
+        @out.send :warn_without_color, $terminal.color(message.to_s, :blue) if verbose
       end
       
       # Show error message.  Use this when you need to show an error message and not throwing
@@ -105,7 +105,7 @@ module Buildr
     # Parse the given arguments array
     def parse_options(argv)
       argv, ignored = *self.class.argv_ignored(argv)
-      self.class.require_early!(argv) { |file| app.instance_eval { require val } }
+      self.class.require_early!(argv) { |feature| app.instance_eval { require feature } }
       @argv = options_parser.parse(argv)
     end
 

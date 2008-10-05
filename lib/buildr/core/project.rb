@@ -14,9 +14,6 @@
 # the License.
 
 
-require 'buildr/core/util'
-
-
 module Buildr
 
   # Symbolic mapping for directory layout.  Used for both the default and custom layouts.
@@ -367,7 +364,7 @@ module Buildr
       
     end
 
-
+    
     # Project has visibility to everything in the Buildr namespace.
     include Buildr
     include MessageChain.collector(:@after_define)
@@ -689,9 +686,9 @@ module Buildr
       def included(base) #:nodoc:
         # When included in Project, add callback and call first_time.
         if Project == base
+          Application.init { |app| app.switch_to_namespace([]) { first_time.call(app) } }
           base.before_define before_define
           base.after_define after_define
-          Application.init { first_time.call(self) }
         end
       end
 
@@ -857,3 +854,4 @@ module Buildr
 
 
 end
+ 

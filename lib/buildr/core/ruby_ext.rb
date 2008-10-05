@@ -34,8 +34,8 @@ if RUBY_VERSION < '1.9.0'
   class BasicObject #:nodoc:
     (instance_methods - ['__send__', '__id__', '==', 'send', 'send!', 'respond_to?', 'equal?', 'object_id']).
       each do |method|
-        undef_method method
-      end
+      undef_method method
+    end
 
     def self.ancestors
       [Kernel]

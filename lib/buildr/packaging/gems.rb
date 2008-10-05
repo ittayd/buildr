@@ -14,12 +14,6 @@
 # the License.
 
 
-require 'buildr/packaging/package'
-require 'buildr/packaging/zip'
-require 'rubyforge'
-require 'rubygems/package'
-
-
 module Buildr
 
   class PackageGemTask < ArchiveTask

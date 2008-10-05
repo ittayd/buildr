@@ -14,12 +14,6 @@
 # the License.
 
 
-require 'buildr/core/project'
-require 'buildr/core/common'
-require 'buildr/core/checks'
-require 'buildr/core/environment'
-
-
 module Buildr
 
   class Options
@@ -37,7 +31,6 @@ module Buildr
 
   task('parallel') { Buildr.options.parallel = true }
 
-
   module Build
 
     include Extension
@@ -47,7 +40,7 @@ module Buildr
       Project.local_task('build') { |name| "Building #{name}" }
       desc 'Clean files generated during a build'
       Project.local_task('clean') { |name| "Cleaning #{name}" }
-
+      
       desc 'The default task is build'
       task 'default'=>'build'
     end

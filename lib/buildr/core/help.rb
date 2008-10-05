@@ -14,10 +14,6 @@
 # the License.
 
 
-require 'buildr/core/common'
-require 'buildr/core/project'
-
-
 module Buildr
 
   module Help #:nodoc:
@@ -62,7 +58,7 @@ task 'help' do
   puts
 
   # Show only the top-level projects.
-  projects.reject(&:parent).tap do |top_level|
+  Buildr.projects.reject(&:parent).tap do |top_level|
     unless top_level.empty?
       puts 'Top-level projects (buildr help:projects for full list):'
       width = [top_level.map(&:name).map(&:size), 20].flatten.max
@@ -101,15 +97,15 @@ namespace 'help' do
 
   desc 'List all projects defined by this buildfile'
   task 'projects' do
-    width = projects.map(&:name).map(&:size).max
-    projects.each do |project|
+    width = Buildr.projects.map(&:name).map(&:size).max
+    Buildr.projects.each do |project|
       puts project.comment.to_s.empty? ? "  #{project.name}" : ("  %-#{width}s  # %s" % [project.name, project.comment])
     end
   end
 
   desc 'List all tasks available from this buildfile'
   task 'tasks' do
-    Buildr.application.tasks.select(&:comment).reject { |task| Project === task }.tap do |tasks|
+    Buildr.application.tasks.select(&:comment).reject { |task| Buildr::Project === task }.tap do |tasks|
       width = [tasks.map(&:name).map(&:size), 20].flatten.max
       tasks.each do |task|
         printf "  %-#{width}s  # %s\n", task.name, task.comment

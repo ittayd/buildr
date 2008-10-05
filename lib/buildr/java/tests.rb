@@ -14,11 +14,6 @@
 # the License.
 
 
-require 'buildr/core/build'
-require 'buildr/core/compile'
-require 'buildr/java/ant'
-
-
 module Buildr
 
   class TestFramework::Java < TestFramework::Base

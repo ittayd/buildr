@@ -14,15 +14,64 @@
 # the License.
 
 
-require 'buildr/core/common'
-require 'buildr/core/message'
-require 'buildr/core/application'
-require 'buildr/core/project'
-require 'buildr/core/environment'
-require 'buildr/core/help'
-require 'buildr/core/build'
-require 'buildr/core/filter'
-require 'buildr/core/compile'
-require 'buildr/core/test'
-require 'buildr/core/checks'
-require 'buildr/core/generate'
+Buildr.before_require! 'buildr/core/common' do
+  require 'rake'
+  require 'tempfile'
+  require 'open-uri'
+  $LOADED_FEATURES << 'rubygems/open-uri.rb' # avoid loading rubygems' open-uri
+  require 'buildr/core/ruby_ext'
+  require 'buildr/core/util'
+end
+
+Buildr.before_require! 'buildr/core/message'
+
+Buildr.before_require! 'buildr/core/application' do
+  require 'buildr/core/rake_ext'
+  require 'buildr/core/application_cli'
+  Gem.autoload :SourceInfoCache, 'rubygems/source_info_cache'
+end
+
+Buildr.before_require! 'buildr/core/project' do
+  require 'buildr/core/common'
+end
+
+Buildr.before_require! 'buildr/core/environment' do
+  require 'yaml'
+end
+
+Buildr.before_require! 'buildr/core/help' do
+  require 'buildr/core/common'
+  require 'buildr/core/project'
+end
+
+Buildr.before_require! 'buildr/core/build' do
+  require 'buildr/core/project'
+  require 'buildr/core/common'
+  require 'buildr/core/checks'
+  require 'buildr/core/environment'
+end
+
+Buildr.before_require! 'buildr/core/filter'
+
+Buildr.before_require! 'buildr/core/compile' do
+  require 'buildr/core/common'
+end
+
+Buildr.before_require! 'buildr/core/test' do 
+  require 'buildr/core/project'
+  require 'buildr/core/build'
+  require 'buildr/core/compile'
+end
+
+Buildr.before_require! 'buildr/core/checks' do
+  require 'buildr/core/project'
+  require 'buildr/packaging/zip'
+  #require 'test/unit'
+  require 'spec/matchers'
+  require 'spec/expectations'
+end
+
+Buildr.before_require! 'buildr/core/generate' do
+  require 'buildr/java/pom'
+end
+

@@ -14,8 +14,37 @@
 # the License.
 
 
-require 'buildr/packaging/zip'
-require 'buildr/packaging/tar'
-require 'buildr/packaging/artifact'
-require 'buildr/packaging/package'
-require 'buildr/packaging/gems'
+Buildr.before_require! 'buildr/packaging/zip' do
+  $LOADED_FEATURES.unshift 'ftools' if RUBY_VERSION >= '1.9.0'
+  require 'zip/zip'
+  require 'zip/zipfilesystem'
+end
+
+Buildr.before_require! 'buildr/packaging/tar' do
+  require 'buildr/packaging/zip'
+  require 'archive/tar/minitar'
+end
+
+Buildr.before_require! 'buildr/packaging/artifact' do
+  require 'builder'
+  require 'buildr/core/project'
+  require 'buildr/core/transports'
+  require 'buildr/packaging/artifact_namespace'
+end
+
+Buildr.before_require! 'buildr/packaging/package' do
+  require 'buildr/core/project'
+  require 'buildr/core/compile'
+  require 'buildr/packaging/artifact'
+end
+
+Buildr.before_require! 'buildr/packaging/gems' do
+  require 'buildr/packaging/package'
+  require 'buildr/packaging/zip'
+  require 'rubyforge'
+  require 'rubygems/package'
+end
+
+Buildr.before_require! 'buildr/packaging/artifact_namespace' do
+  require 'buildr/java/version_requirement'
+end

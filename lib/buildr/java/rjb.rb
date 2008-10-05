@@ -14,9 +14,6 @@
 # the License.
 
 
-require 'rjb'
-
-
 # Equivalent to Java system properties.  For example:
 #   ENV_JAVA['java.version']
 #   ENV_JAVA['java.class.version']

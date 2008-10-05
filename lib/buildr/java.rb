@@ -14,10 +14,42 @@
 # the License.
 
 
-require RUBY_PLATFORM == 'java' ? 'buildr/java/jruby' : 'buildr/java/rjb'
-require 'buildr/java/compiler'
-require 'buildr/java/tests'
-require 'buildr/java/bdd'
-require 'buildr/java/packaging'
-require 'buildr/java/commands'
-require 'buildr/java/deprecated'
+if RUBY_PLATFORM == 'java'
+  Buildr.before_require! 'buildr/java/jruby' do
+    require 'java'
+    require 'jruby'
+  end
+else
+  Buildr.before_require! 'buildr/java/rjb' do
+    require 'rjb'
+  end
+end
+
+Buildr.before_require! 'buildr/java/compiler' do 
+  require 'buildr/core/project'
+  require 'buildr/core/common'
+  require 'buildr/core/compile'
+  require 'buildr/packaging'
+end
+
+Buildr.before_require! 'buildr/java/tests' do
+  require 'buildr/core/build'
+  require 'buildr/core/compile'
+  require 'buildr/java/ant'
+end
+
+Buildr.before_require! 'buildr/java/bdd' do 
+  require 'buildr/java/tests'
+  require 'buildr/java/test_result'
+end
+
+Buildr.before_require! 'buildr/java/packaging' do
+  require 'buildr/packaging'
+end
+
+Buildr.before_require! 'buildr/java/commands'
+
+Buildr.before_require! 'buildr/java/deprecated' do
+  require 'buildr/core/project'
+end
+
