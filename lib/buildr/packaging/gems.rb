@@ -71,7 +71,7 @@ module Buildr
 
   module PackageAsGem
 
-    def package_as_gem(file_name) #:nodoc:
+    def package_as_gem(file_name, artifact_spec) #:nodoc:
       PackageGemTask.define_task(file_name).tap do |gem|
         %w{ lib test doc }.each do |dir|
           gem.include :from=>_(dir), :path=>dir if File.directory?(_(dir))

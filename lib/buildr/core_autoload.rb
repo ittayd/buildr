@@ -56,4 +56,13 @@ Buildr.Autoload do
   const :Generate => 'buildr/core/generate'
   task 'buildr/core/generate', 'generate'
 
+  # transports.rb
+  const '::URI::NotFoundError' => 'buildr/core/transports'
+  after_require 'net/http' do
+    require 'buildr/core/transports'
+  end
+
+  # progressbar.rb
+  const '::ProgressBar' => 'buildr/core/progressbar'
+
 end

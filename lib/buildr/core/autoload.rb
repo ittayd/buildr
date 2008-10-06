@@ -25,9 +25,15 @@ module Buildr #:nodoc:
   class ::Object
     alias_method :require_without_buildr_autoload, :require
     
-    def require_with_buildr_autoload(feature)      
+    def require_with_buildr_autoload(feature)
       Buildr::Autoload.requiring(feature) do
-        require_without_buildr_autoload(feature)
+        if ctx = Buildr::Context.current
+          ctx.application.switch_to_namespace([]) do
+            require_without_buildr_autoload(feature)
+          end
+        else
+          require_without_buildr_autoload(feature)
+        end
       end
     end
 
@@ -60,18 +66,28 @@ module Buildr #:nodoc:
   end # Message
 
   module ::Rake::TaskManager
-    alias_method :at_without_buildr_autoload, :[]
-    
-    def at_with_buildr_autoload(task, *args, &block)
+
+    # Lookup the task name
+    def lookup_in_scope(name, scope)
+      n = scope.size
+      while n >= 0
+        tn = (scope[0,n] + [name]).join(':')
+        task = @tasks[tn] || lazy_task(tn)
+        return task if task
+        n -= 1
+      end
+      nil
+    end
+
+    def lazy_task(task)
       features = []
       LazyRake.lazy_tasks.delete_if { |f,a| a.any? { |r| r === task } && features << f }
       unless features.empty?
         features.each { |feature| feature.respond_to?(:call) ? feature.call(task) : Object.require(feature) }
       end
-      at_without_buildr_autoload(task, *args, &block)
+      @tasks[task]
     end
-    
-    alias_method :[], :at_with_buildr_autoload
+
   end
 
   module LazyRake
@@ -96,9 +112,10 @@ module Buildr #:nodoc:
       names = name.split('::')
       const = nil
       features = []
+      cand = []
+      cand << "Object::#{name}::#{miss}" unless self == Object
+      names.size.times { |i| cand <<  (names[0..(0 - (i+1))] + [miss]).join('::') }
       LazyConst.lazy_consts.delete_if do |r,f|
-        cand = []
-        names.size.times { |i| cand <<  (names[0..(0 - (i+1))] + [miss]).join('::') }
         cand.any? { |c| r === c and const = c and features << f }
       end
       features = features.flatten.compact

@@ -53,3 +53,8 @@ Buildr.before_require! 'buildr/java/deprecated' do
   require 'buildr/core/project'
 end
 
+Buildr.before_require! 'buildr/java/ant' do
+  require 'antwrap'
+  require 'buildr/core/project'
+  require 'buildr/core/help'
+end

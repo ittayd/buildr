@@ -14,11 +14,6 @@
 # the License.
 
 
-require 'antwrap'
-require 'buildr/core/project'
-require 'buildr/core/help'
-
-
 module Buildr
   module Ant
 

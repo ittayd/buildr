@@ -25,7 +25,6 @@ require 'digest/md5'
 require 'digest/sha1'
 require 'stringio'
 require 'tempfile'
-require 'buildr/core/progressbar'
 
 
 # Monkeypatching: SFTP never defines the mkdir method on its session or the underlying
@@ -265,7 +264,7 @@ module URI
     def with_progress_bar(show, file_name, size, &block) #:nodoc:
       options = { :total=>size || 0, :title=>file_name }
       options[:hidden] = true unless show
-      ProgressBar.start options, &block
+      ::ProgressBar.start options, &block
     end
 
     # :call-seq:

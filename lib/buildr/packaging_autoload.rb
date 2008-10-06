@@ -33,7 +33,7 @@ Buildr.Autoload do
   const [:ActsAsArtifact, :Artifact, :Repositories] => 'buildr/packaging/artifact'
   method 'buildr/packaging/artifact', Buildr,
   :repositories, :artifact, :artifacts, :transitive, :group, :install, :upload
-  task 'buildr/packaging/artifact', 'artifacts', /(un)?install/, 'upload'
+  task 'buildr/packaging/artifact', /artifacts/, /(un)?install/, 'upload'
 
   # package.rb
   const :Package => 'buildr/packaging/package'
@@ -43,7 +43,8 @@ Buildr.Autoload do
   
   # gems.rb
   const [:PackageAsGem, :PackageGemTask] => 'buildr/packaging/gems'
-  
+  method 'buildr/packaging/gems', Buildr::Project, :package_as_gem
+
   # artifact_namespace.rb
   const :ArtifactNamespace => 'buildr/packaging/artifact_namespace'
   

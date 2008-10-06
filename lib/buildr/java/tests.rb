@@ -29,7 +29,7 @@ module Buildr
   private
 
     # Add buildr utilities (JavaTestFilter) to classpath
-    Java.classpath << File.join(File.dirname(__FILE__))
+    ::Java.classpath << File.join(File.dirname(__FILE__))
 
     # :call-seq:
     #     filter_classes(dependencies, criteria)

@@ -20,18 +20,21 @@ end
 
 require 'buildr/core/autoload'
 
+autoload(:Antwrap, 'antwrap')
 autoload(:Builder, 'builder')
 autoload(:Config, 'rbconfig')
 autoload(:FileUtils, 'fileutils')
 autoload(:JRuby, 'jruby')
 autoload(:OptionParser, 'optparse')
 autoload(:Tempfile, 'tempfile')
-autoload(:URI, 'open-uri')
+Buildr::Autoload.const '::URI' => ['uri', 'open-uri']
 autoload(:Zlib, 'zlib')
 
 Gem.autoload :SourceInfoCache, 'rubygems/source_info_cache'
 $LOADED_FEATURES << 'rubygems/open-uri.rb' # avoid loading rubygems' open-uri
 $LOADED_FEATURES << 'ftools' if RUBY_VERSION >= '1.9.0'
+
+Buildr::Autoload.method 'tmpdir', class << Dir; self; end, :tmpdir
 
 require 'buildr/core_autoload'
 require 'buildr/packaging_autoload'

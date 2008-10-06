@@ -13,14 +13,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
-require 'uri'
 require 'net/http'
-require 'buildr/core/project'
-require 'buildr/java'
-require 'buildr/packaging'
 require 'thread'
-
 
 module Buildr
 
@@ -52,8 +46,8 @@ module Buildr
       "org.mortbay.jetty:servlet-api-2.5:jar:#{VERSION}", "org.slf4j:slf4j-api:jar:#{SLF4J_VERSION}", 
       "org.slf4j:slf4j-simple:jar:#{SLF4J_VERSION}", "org.slf4j:jcl104-over-slf4j:jar:#{SLF4J_VERSION}" ]
      
-    Java.classpath <<  REQUIRES
-    Java.classpath << File.dirname(__FILE__)
+    ::Java.classpath <<  REQUIRES
+    ::Java.classpath << File.dirname(__FILE__)
     
     # Default URL for Jetty (change with options.jetty.url).
     URL = "http://localhost:8080"

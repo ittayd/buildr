@@ -49,6 +49,11 @@ Buildr.Autoload do
   
   # commands.rb
   const '::Java::Commands' => 'buildr/java/commands'
+
+  # ant.rb
+  const :Ant => 'buildr/java/ant'
+  method 'buildr/java/ant', (class << Buildr; self; end), :ant
+  method 'buildr/java/ant', Buildr::Project, :ant
   
   # deprecated.rb
   const '::Java::JavaWrapper' => 'buildr/java/deprecated'

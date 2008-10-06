@@ -356,7 +356,7 @@ module Buildr
       unless rakefile
         error = "No Buildfile found (looking for: #{rakefiles.join(', ')})"
         if STDIN.isatty
-          self['generate'].invoke
+          Rake::Task['generate'].invoke
           exit 1
         else
           raise error

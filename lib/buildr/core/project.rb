@@ -686,17 +686,26 @@ module Buildr
       def included(base) #:nodoc:
         # When included in Project, add callback and call first_time.
         if Project == base
+          # first_time invoked on top level namespace, so that creating local tasks works when autoloading
           Application.init { |app| app.switch_to_namespace([]) { first_time.call(app) } }
-          base.before_define before_define
-          base.after_define after_define
+          base.before_define do |project|
+            # will get invoked while in project's namespace
+            project.application.switch_to_namespace(project.name.split(':')) { before_define.call(project) }
+          end
+          base.after_define do |project|
+            # will get invoked while in project's namespace
+            project.application.switch_to_namespace(project.name.split(':')) { after_define.call(project) }
+          end
         end
       end
 
       def extended(base) #:nodoc:
         # When extending project, add instance and call before_define.
         if Project === base
-          base.after_define after_define
-          before_define.call base
+          base.after_define do |project|
+            project.application.switch_to_namespace(project.name.split(':')) { after_define.call(project) }
+          end
+          base.application.switch_to_namespace(base.name.split(':')) { before_define.call(base) }
         end
       end
 
