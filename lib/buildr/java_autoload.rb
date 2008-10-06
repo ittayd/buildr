@@ -13,42 +13,44 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+Buildr.Autoload do
 
-if RUBY_PLATFORM == 'java'
-  Buildr::Autoload.const '::Java' => ['java', 'jruby', 'buildr/java/jruby']
-else
-  Buildr::Autoload.const '::Java' => ['rjb', 'buildr/java/rjb']
+  if RUBY_PLATFORM == 'java'
+    const '::Java' => ['java', 'jruby', 'buildr/java/jruby']
+  else
+    const '::Java' => ['rjb', 'buildr/java/rjb']
+  end
+
+  # compiler.rb
+  const ['Compiler::Javac', 'Javadoc', 'Apt'] => 'buildr/java/compiler'
+  task 'buildr/java/compiler', /javadoc/
+  method 'buildr/java/compiler', Buildr::Project, :javadoc, :apt
+  compiler 'buildr/java/compiler', :javac
+  
+  # tests.rb
+  const ['TestFramework::Java', :JMock, :JUnit, :TestNG] => 'buildr/java/tests'
+  task 'buildr/java/tests', /junit/
+  tester 'buildr/java/tests', :junit, :testng
+  
+  # bdd.rb
+  const ['TestFramework::JavaBDD', 'TestFramework::JRubyBased', :RSpec, :JtestR, :JBehave] => 'buildr/java/bdd'
+  tester 'buildr/java/bdd', :rspec, :jtestr, :jbehave
+  
+  # packaging.rb  
+  const 'Packaging::Java' => 'buildr/java/packaging'
+  method 'buildr/java/packaging', Buildr::Project,
+  :manifest, :meta_inf, :package_with_sources, :package_with_javadoc,
+  :package_as_jar, :package_as_war, :package_as_aar, :package_as_ear, 
+  :package_as_javadoc_spec, :package_as_javadoc
+  before_require 'buildr/java/packaging' do
+    require 'buildr/packaging/package'
+    require 'buildr/packaging/zip'
+  end
+  
+  # commands.rb
+  const '::Java::Commands' => 'buildr/java/commands'
+  
+  # deprecated.rb
+  const '::Java::JavaWrapper' => 'buildr/java/deprecated'
+  
 end
-
-# compiler.rb
-Buildr::Autoload.const ['Compiler::Javac', 'Javadoc', 'Apt'] => 'buildr/java/compiler'
-Buildr::Autoload.task 'buildr/java/compiler', /javadoc/
-Buildr::Autoload.method 'buildr/java/compiler', Buildr::Project, :javadoc, :apt
-Buildr::Autoload.compiler 'buildr/java/compiler', :javac
-
-# tests.rb
-Buildr::Autoload.const ['TestFramework::Java', :JMock, :JUnit, :TestNG] => 'buildr/java/tests'
-Buildr::Autoload.task 'buildr/java/tests', /junit/
-Buildr::Autoload.tester 'buildr/java/tests', :junit, :testng
-
-# bdd.rb
-Buildr::Autoload.const ['TestFramework::JavaBDD', 'TestFramework::JRubyBased', :RSpec, :JtestR, :JBehave] => 'buildr/java/bdd'
-Buildr::Autoload.tester 'buildr/java/bdd', :rspec, :jtestr, :jbehave
-
-# packaging.rb
-Buildr.before_require 'buildr/java/packaging' do
-  require 'buildr/packaging/package'
-  require 'buildr/packaging/zip'
-end
-
-Buildr::Autoload.const 'Packaging::Java' => 'buildr/java/packaging'
-Buildr::Autoload.method 'buildr/java/packaging', Buildr::Project,
-:manifest, :meta_inf, :package_with_sources, :package_with_javadoc,
-:package_as_jar, :package_as_war, :package_as_aar, :package_as_ear, 
-:package_as_javadoc_spec, :package_as_javadoc
-
-# commands.rb
-Buildr::Autoload.const '::Java::Commands' => 'buildr/java/commands'
-
-# deprecated.rb
-Buildr::Autoload.const '::Java::JavaWrapper' => 'buildr/java/deprecated'

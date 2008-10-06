@@ -13,45 +13,47 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+Buildr.Autoload do
+  
+  # common.rb
+  const :Util => 'buildr/core/util', :ConcatTask => 'buildr/core/common'
+  method 'buildr/core/common', Buildr, :struct, :write, :read, :download, :concat
 
-# common.rb
-Buildr::Autoload.const :Util => 'buildr/core/util', :ConcatTask => 'buildr/core/common'
-Buildr::Autoload.method 'buildr/core/common', Buildr, :struct, :write, :read, :download, :concat
+  # project.rb
+  require 'buildr/core/project'
 
-# project.rb
-require 'buildr/core/project'
+  # environment.rb
+  require 'buildr/core/environment'
 
-# environment.rb
-require 'buildr/core/environment'
+  # help.rb
+  const :Help => 'buildr/core/help'
+  method 'buildr/core/help', Buildr, :help
+  task 'buildr/core/help', /^help(:(projects|tasks))?$/
 
-# help.rb
-Buildr::Autoload.const :Help => 'buildr/core/help'
-Buildr::Autoload.method 'buildr/core/help', Buildr, :help
-Buildr::Autoload.task 'buildr/core/help', /^help(:(projects|tasks))?$/
+  # build.rb
+  const [:Build, :Svn, :Release] => 'buildr/core/build'
+  method 'buildr/core/build', Buildr::Options, :parallel
+  task 'buildr/core/build', /default|parallel|release|build|clean/
 
-# build.rb
-Buildr::Autoload.const [:Build, :Svn, :Release] => 'buildr/core/build'
-Buildr::Autoload.method 'buildr/core/build', Buildr::Options, :parallel
-Buildr::Autoload.task 'buildr/core/build', /default|parallel|release|build|clean/
+  # filter.rb
+  const :Filter => 'buildr/core/filter'
+  method 'buildr/core/filter', Buildr, :filter
 
-# filter.rb
-Buildr::Autoload.const :Filter => 'buildr/core/filter'
-Buildr::Autoload.method 'buildr/core/filter', Buildr, :filter
+  # compile.rb
+  const [:CompilerTask, :CompileTask, :ResourcesTask, :Compile, :Compiler, 'Compiler::Base'] => 'buildr/core/compile'
+  method 'buildr/core/compile', Buildr::Project, :compile, :resources
+  task 'buildr/core/compile', /(compile|resources)$/
 
-# compile.rb
-Buildr::Autoload.const [:CompilerTask, :CompileTask, :ResourcesTask, :Compile, :Compiler, 'Compiler::Base'] => 'buildr/core/compile'
-Buildr::Autoload.method 'buildr/core/compile', Buildr::Project, :compile, :resources
-Buildr::Autoload.task 'buildr/core/compile', /(compile|resources)$/
+  # test.rb
+  const [:TestFramework, :TestTask, :IntegrationTestTask, :Test] => 'buildr/core/test'
+  method 'buildr/core/test', Buildr, :integration
+  task 'buildr/core/test', 'test', /(^|:)test:/
 
-# test.rb
-Buildr::Autoload.const [:TestFramework, :TestTask, :IntegrationTestTask, :Test] => 'buildr/core/test'
-Buildr::Autoload.method 'buildr/core/test', Buildr, :integration
-Buildr::Autoload.task 'buildr/core/test', 'test', /(^|:)test:/
+  # checks.rb
+  const :Checks => 'buildr/core/checks'
 
-# checks.rb
-Buildr::Autoload.const :Checks => 'buildr/core/checks'
+  # generate.rb
+  const :Generate => 'buildr/core/generate'
+  task 'buildr/core/generate', 'generate'
 
-# generate.rb
-Buildr::Autoload.const :Generate => 'buildr/core/generate'
-Buildr::Autoload.task 'buildr/core/generate', 'generate'
-
+end

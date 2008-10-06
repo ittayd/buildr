@@ -22,36 +22,13 @@ require 'buildr/core/application_cli'
 
 module Buildr #:nodoc:
 
-  class << self
-
-    def before_requires
-      @before_requires ||= Hash.new
-    end
-
-    def before_require(feature, &before)
-      if prev = before_requires[feature] 
-        before_requires[feature] = lambda { prev.call; before.call }
-      else
-        before_requires[feature] = before
-      end
-    end
-    
-    def before_require!(feature, &before)
-      before_require(feature, &before)
-      Application.boot { require feature }
-    end
-    
-  end # << Buildr
-
   class ::Object
     alias_method :require_without_buildr_autoload, :require
     
-    def require_with_buildr_autoload(feature)
-      Buildr::Message.remove_before_autoload(feature)
-      if before = Buildr.before_requires.delete(feature)
-        before.call
+    def require_with_buildr_autoload(feature)      
+      Buildr::Autoload.requiring(feature) do
+        require_without_buildr_autoload(feature)
       end
-      require_without_buildr_autoload(feature)
     end
 
     alias_method :require, :require_with_buildr_autoload
@@ -162,7 +139,50 @@ module Buildr #:nodoc:
 
   module LazyCompiler
     
+    class << self
+      def autoload(feature, name, attrs = {})
+        compiler = Class.new(Compiler::Base)
+        Compiler.compilers << compiler
+        meta = class << compiler; self; end
+        meths = compiler.singleton_methods - instance_methods(false)
+        Message.define(meta, meths) do |obj, msg|
+          msg.call LazyCompiler[name]
+        end
+        compiler.extend self
+        attrs.update :feature => feature, :name => name
+        attrs.each { |a, v| compiler.instance_variable_set("@#{a}", v) }
+      end
+
+      def [](compiler_name)
+        cmp = Compiler.select(compiler_name)
+        cmp = cmp.real if LazyCompiler === cmp
+        cmp
+      end
+    end
+
+    def real
+      Compiler.compilers.delete(self)
+      require @feature
+      Compiler.select(to_sym)
+    end
+
+    def new(*args, &block)
+      LazyCompiler[to_sym].new(*args, &block)
+    end
+
+    def name
+      @name.to_s
+    end
+
+    def to_sym
+      @name
+    end
+
   end # LazyCompiler
+
+  def Buildr.Autoload(&block)
+    Autoload.module_eval(&block)
+  end
 
   module Autoload
     extend self
@@ -179,14 +199,46 @@ module Buildr #:nodoc:
       LazyConst.autoload(*args, &block)
     end
 
-    def compiler(*args, &block)
-      # TODO: define autoloaded compilers
+    def compiler(feature, *args, &block)
+      if defined?(Compiler)
+        before_require! feature
+      else
+        after_require 'buildr/core/compile' do
+          LazyCompiler.autoload(feature, *args, &block)
+        end
+      end
     end
 
     def tester(*args, &block)
       # TODO: define autoloaded test frameworks
     end
 
+    def on_requires
+      @on_requires ||= Hash.new { |h,k| h[k] = [[], []] }
+    end
+
+    def requiring(feature)
+      Message.remove_before_autoload(feature)
+      before, after = on_requires[feature]
+      before.map(&:call)
+      res = yield
+      after.map(&:call)
+      res
+    end
+
+    def before_require(feature, &before)
+      on_requires[feature].first << before if before
+    end
+
+    def before_require!(feature, &before)
+      before_require(feature, &before) if before
+      Application.boot { require feature }
+    end
+
+    def after_require(feature, &after)
+      on_requires[feature].last << after if after
+    end
+    
   end
 
   Application.boot do

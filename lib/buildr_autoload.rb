@@ -27,11 +27,11 @@ autoload(:JRuby, 'jruby')
 autoload(:OptionParser, 'optparse')
 autoload(:Tempfile, 'tempfile')
 autoload(:URI, 'open-uri')
-Buildr::Autoload.const '::Zip' => ['zip/zip', 'zip/zipfilesystem']
-Buildr::Autoload.const '::Zlib' => ['zlib', 'archive/tar/minitar']
+autoload(:Zlib, 'zlib')
 
 Gem.autoload :SourceInfoCache, 'rubygems/source_info_cache'
 $LOADED_FEATURES << 'rubygems/open-uri.rb' # avoid loading rubygems' open-uri
+$LOADED_FEATURES << 'ftools' if RUBY_VERSION >= '1.9.0'
 
 require 'buildr/core_autoload'
 require 'buildr/packaging_autoload'

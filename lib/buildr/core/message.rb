@@ -55,7 +55,7 @@ module Buildr
         raise "Invalid visibility modifier: #{visibility}" unless 
           [:public, :protected, :private].include? visibility
         anon = Module.new do |anon|
-          (class << anon; self end).module_eval { define_method(:message_impl, implementation) }
+          (class << anon; self end).module_eval { define_method(:impl) { implementation } }
         end
         defined_from = caller.first
         on_module.extend anon
@@ -63,7 +63,7 @@ module Buildr
           on_module.module_eval <<-RUBY, __FILE__, 1+__LINE__
             def #{name}(*args, &block)
               anon = ObjectSpace._id2ref(#{anon.object_id})
-              anon.message_impl(self, Message.new(:'#{name}', args, block))
+              anon.impl.call(self, Message.new(:'#{name}', args, block))
             end
             #{visibility} :#{name}
           RUBY

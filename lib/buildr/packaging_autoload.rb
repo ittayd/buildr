@@ -13,30 +13,38 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# zip.rb
-$LOADED_FEATURES.unshift 'ftools' if RUBY_VERSION >= '1.9.0'
-Buildr::Autoload.const [:ArchiveTask, :ZipTask, :Unzip] => 'buildr/packaging/zip'
-Buildr::Autoload.method 'buildr/packaging/zip', Buildr, :zip, :unzip
+Buildr.Autoload do
+  
+  # zip.rb
+  const [:ArchiveTask, :ZipTask, :Unzip] => 'buildr/packaging/zip'
+  method 'buildr/packaging/zip', Buildr, :zip, :unzip
+  before_require 'buildr/packaging/zip' do
+    require 'zip/zip'
+  end
 
-# tar.rb
-Buildr::Autoload.const :TarTask => 'buildr/packaging/tar'
-Buildr::Autoload.method 'buildr/packaging/tar', Buildr, :tar
+  # tar.rb
+  const :TarTask => 'buildr/packaging/tar'
+  method 'buildr/packaging/tar', Buildr, :tar
+  before_require 'buildr/packaging/tar' do
+    require 'archive/tar/minitar'
+  end
 
-# artifact.rb
-Buildr::Autoload.const [:ActsAsArtifact, :Artifact, :Repositories] => 'buildr/packaging/artifact'
-Buildr::Autoload.method 'buildr/packaging/artifact', Buildr,
-:repositories, :artifact, :artifacts, :transitive, :group, :install, :upload
-Buildr::Autoload.task 'buildr/packaging/artifact', 'artifacts', /(un)?install/, 'upload'
+  # artifact.rb
+  const [:ActsAsArtifact, :Artifact, :Repositories] => 'buildr/packaging/artifact'
+  method 'buildr/packaging/artifact', Buildr,
+  :repositories, :artifact, :artifacts, :transitive, :group, :install, :upload
+  task 'buildr/packaging/artifact', 'artifacts', /(un)?install/, 'upload'
 
-# package.rb
-Buildr::Autoload.const :Package => 'buildr/packaging/package'
-Buildr::Autoload.method 'buildr/packaging/package', Buildr::Project, 
-:id, :version, :version=, :group, :group=, :package, :packages
-Buildr::Autoload.task 'buildr/packaging/package', /:?package:?/
-
-# gems.rb
-Buildr::Autoload.const [:PackageAsGem, :PackageGemTask] => 'buildr/packaging/gems'
-
-# artifact_namespace.rb
-Buildr::Autoload.const :ArtifactNamespace => 'buildr/packaging/artifact_namespace'
-
+  # package.rb
+  const :Package => 'buildr/packaging/package'
+  method 'buildr/packaging/package', Buildr::Project,
+  :id, :version, :version=, :group, :group=, :package, :packages
+  task 'buildr/packaging/package', /:?package:?/
+  
+  # gems.rb
+  const [:PackageAsGem, :PackageGemTask] => 'buildr/packaging/gems'
+  
+  # artifact_namespace.rb
+  const :ArtifactNamespace => 'buildr/packaging/artifact_namespace'
+  
+end
