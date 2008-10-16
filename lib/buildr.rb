@@ -14,12 +14,13 @@
 # the License.
 
 module Buildr
-  VERSION = '1.3.3'.freeze
+  VERSION = '1.3.4'.freeze
 end
 
 require 'buildr/core'
 require 'buildr/packaging'
 require 'buildr/java'
+require 'buildr/scala'
 require 'buildr/ide'
 
 # Methods defined in Buildr are both instance methods (e.g. when included in Project)

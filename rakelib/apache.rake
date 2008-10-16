@@ -49,7 +49,10 @@ namespace 'apache' do
   end
   
   # Staging checks specific for Apache.
-  task 'check'=>'license'
+  task 'check'=>'license' do |task, args|
+    args.gpg_user or fail "Please run with gpg_user=<argument for gpg --local-user>"
+    fail "No GPG user #{args.gpg_user}" if `gpg --list-keys #{args.gpg_user}`.empty?
+  end
 
 
   file 'staged/distro'=>'package' do
@@ -65,8 +68,8 @@ namespace 'apache' do
     puts "Signing packages in staged/distro as user #{gpg_user}"
     FileList['staged/distro/*.{gem,zip,tgz}'].each do |pkg|
       bytes = File.open(pkg, 'rb') { |file| file.read }
-      File.open(pkg + '.md5', 'w') { |file| file.write MD5.hexdigest(bytes) << ' ' << File.basename(pkg) }
-      File.open(pkg + '.sha1', 'w') { |file| file.write SHA1.hexdigest(bytes) << ' ' << File.basename(pkg) }
+      File.open(pkg + '.md5', 'w') { |file| file.write Digest::MD5.hexdigest(bytes) << ' ' << File.basename(pkg) }
+      File.open(pkg + '.sha1', 'w') { |file| file.write Digest::SHA1.hexdigest(bytes) << ' ' << File.basename(pkg) }
       sh 'gpg', '--local-user', gpg_user, '--armor', '--output', pkg + '.asc', '--detach-sig', pkg, :verbose=>true
     end
     cp 'etc/KEYS', 'staged/distro'
@@ -88,7 +91,7 @@ namespace 'apache' do
     url = args.incubating ? "http://www.apache.org/dist/incubator/#{spec.name}/#{spec.version}-incubating" :
       "http://www.apache.org/dist/#{spec.name}/#{spec.version}"
     rows = FileList['staged/distro/*.{gem,tgz,zip}'].map { |pkg|
-      name, md5 = File.basename(pkg), MD5.file(pkg).to_s
+      name, md5 = File.basename(pkg), Digest::MD5.file(pkg).to_s
       %{| "#{name}":#{url}/#{name} | "#{md5}":#{url}/#{name}.md5 | "Sig":#{url}/#{name}.asc |}
     }
     textile = <<-TEXTILE
@@ -121,7 +124,55 @@ p>. ("Release signing keys":#{url}/KEYS)
     sh 'rsync', '--progress', '--recursive', '--delete', 'published/site/', target
     puts 'Done'
   end
+  
+  
+  file 'release-vote-email.txt'=>'CHANGELOG' do |task|
+    # Need to know who you are on Apache, local user may be different (see .ssh/config).
+    whoami = `ssh people.apache.org whoami`.strip
+    base_url = "http://people.apache.org/~#{whoami}/buildr/#{spec.version}"
+    # Need changes for this release only.
+    changelog = File.read('CHANGELOG').scan(/(^(\d+\.\d+(?:\.\d+)?)\s+\(\d{4}-\d{2}-\d{2}\)\s*((:?^[^\n]+\n)*))/)
+    changes = changelog[0][2]
+    previous_version = changelog[1][1]
 
+    email = <<-EMAIL
+To: buildr-dev@incubator.apache.org
+Subject: [VOTE] Buildr #{spec.version} release
+
+We're voting on the source distributions available here:
+#{base_url}/distro/
+
+Specifically:
+#{base_url}/distro/buildr-#{spec.version}-incubating.tgz
+#{base_url}/distro/buildr-#{spec.version}-incubating.zip
+
+The documentation generated for this release is available here:
+#{base_url}/site/
+#{base_url}/site/buildr.pdf
+
+The official specification against which this release was tested:
+#{base_url}/site/specs.html
+
+Test coverage report:
+#{base_url}/site/coverage/index.html
+
+
+The following changes were made since #{previous_version}:
+
+#{changes}
+    EMAIL
+    File.open task.name, 'w' do |file|
+      file.write email
+    end
+    puts "Created release vote email template in '#{task.name}':"
+    puts email
+  end
+
+end
+
+task 'clobber' do
+  rm_rf 'snapshot'
+  rm_f 'release-vote-email.txt'
 end
 
 
@@ -135,7 +186,6 @@ end
 task 'stage' do
   task('apache:snapshot').invoke
 end
+task 'stage:wrapup'=>'release-vote-email.txt'
+
 task 'release:publish'=>['apache:publish:distro', 'apache:publish:site']
-task 'clobber' do
-  rm_rf 'snapshot'
-end
