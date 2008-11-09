@@ -105,7 +105,6 @@ module Buildr
 
   end
 
-
   # A project definition is where you define all the tasks associated with
   # the project you're building.
   #
@@ -185,7 +184,14 @@ module Buildr
   #   puts project('myapp:webapp').compile.classpath.map(&:to_spec)
   #   => 'myapp:myapp-beans:jar:1.1'
   class Project < Rake::Task
-
+    module RecursiveTask
+      attr_accessor :project, :task_name
+      def invoke_prerequisites(*args)
+        @prerequisites |= @project.projects.map {|project| project.task(@task_name)}
+        super
+      end
+    end
+    
     class << self
 
       # :call-seq:
@@ -222,12 +228,12 @@ module Buildr
             @on_define.each { |callback| callback[project] }
           end if @on_define
           # Enhance the project using the definition block.
-          project.enhance { project.instance_eval &block } if block
+          project.enhance {|project| project.instance_eval &block } if block
 
           # Top-level project? Invoke the project definition. Sub-project? We don't invoke
           # the project definiton yet (allow project calls to establish order of evaluation),
-          # but must do so before the parent project's definition is done. 
-          project.parent.enhance { project.invoke } if project.parent
+          # but must do so before the parent project's definition is done.
+          ### project.parent.enhance { project.invoke } if project.parent
         end
       end
 
@@ -236,16 +242,16 @@ module Buildr
       #
       # See Buildr#project.
       def project(*args) #:nodoc:
-        options = args.pop if Hash === args.last
+        options = Hash === args.last ? args.pop : {}
         rake_check_options options, :scope if options
         raise ArgumentError, 'Only one project name at a time' unless args.size == 1
         @projects ||= {}
-        name = args.first.to_s
+       name = args.first.to_s
+        parent_name = name.sub(/:?[^:]*$/, '')
         # Make sure parent project is evaluated (e.g. if looking for foo:bar, find foo first)
-        unless @projects[name]
-          parts = name.split(':')
-          project(parts.first, options || {}) if parts.size > 1
-        end
+        unless parent_name.empty?
+          project(parent_name, options)
+        end        
         if options && options[:scope]
           # We assume parent project is evaluated.
           project = options[:scope].split(':').inject([[]]) { |scopes, scope| scopes << (scopes.last + [scope]) }.
@@ -268,7 +274,6 @@ module Buildr
         @projects ||= {}
         names = names.flatten
         if options && options[:scope]
-          # We assume parent project is evaluated.
           if names.empty?
             parent = @projects[options[:scope].to_s] or raise "No such project #{options[:scope]}"
             @projects.values.select { |project| project.parent == parent }.each { |project| project.invoke }.
@@ -538,9 +543,11 @@ module Buildr
     def recursive_task(*args, &block)
       task_name, arg_names, deps = Buildr.application.resolve_args(args)
       task = Buildr.options.parallel ? multitask(task_name) : task(task_name)
-      parent.task(task_name).enhance [task] if parent
       task.set_arg_names(arg_names) unless arg_names.empty?
       task.enhance Array(deps), &block
+      task.extend RecursiveTask
+      task.project = self
+      task.task_name = task_name
     end
 
     # :call-seq:

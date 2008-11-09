@@ -402,7 +402,18 @@ module Buildr
         end
       end
       load_imports
-      Buildr.projects
+      #Buildr.projects
+      top_level_tasks.each do |task_name|
+        projects =  task_name.split(':').inject([[]]) { |projects, part| projects << (projects.last + [part]) }.reverse
+        projects.each do |project|
+          begin
+            project = Buildr.project(project.join(':'))
+            break if project
+          rescue
+            nil
+          end
+        end
+      end
     end
 
     # Load/install all Gems specified in build.yaml file.

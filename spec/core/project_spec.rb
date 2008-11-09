@@ -81,7 +81,7 @@ describe Project do
   it 'should detect circular dependency' do
     Buildr.define('baz') { define('bar') { project('foo:bar') } }
     Buildr.define('foo') { define('bar') { project('baz:bar') } }
-    lambda { project('foo') }.should raise_error(RuntimeError, /Circular dependency/)
+    lambda { project('foo:bar') }.should raise_error(RuntimeError, /Circular dependency/)
   end
 end
 
@@ -340,6 +340,7 @@ describe Project, '#on_define' do
     scopes = []
     Project.on_define { |project| scopes << Buildr.application.current_scope }
     define('foo') { define 'bar' }
+    project('foo:bar')
     scopes.should eql([['foo'], ['foo', 'bar']])
   end
 
@@ -366,6 +367,7 @@ describe Project, '#on_define' do
     scopes = []
     Project.on_define { |project| project.enhance { scopes << Buildr.application.current_scope } }
     define('foo') { define 'bar' }
+    project('foo:bar')
     scopes.should eql([['foo'], ['foo', 'bar']])
   end
   
@@ -382,10 +384,12 @@ describe Rake::Task, ' recursive' do
       project.recursive_task('doda') { @order << project.name }
     end
     define('foo') { define('bar') { define('baz') } }
+    project('foo:bar:baz')
   end
 
   it 'should invoke same task in child project' do
     task('foo:doda').invoke
+    p @order
     @order.should include('foo:bar:baz')
     @order.should include('foo:bar')
     @order.should include('foo')
@@ -456,8 +460,16 @@ describe 'Sub-project' do
       ordered << self.name
       define('bar') { ordered << self.name }
       define('baz') { ordered << self.name }
-    end 
-    ordered.should eql(['foo', 'foo:bar', 'foo:baz'])
+    end
+    ordered.should eql(['foo'])
+  end
+
+  it 'should not invoke sub projects' do
+    invoked = false
+    define 'foo' do
+      define('bar') { invoked = true}
+    end
+    invoked.should eql(false) 
   end
 
   it 'should execute in order of dependency' do
@@ -466,7 +478,8 @@ describe 'Sub-project' do
       ordered << self.name
       define('bar') { project('foo:baz') ; ordered << self.name }
       define('baz') { ordered << self.name }
-    end 
+    end
+    project('foo').projects 
     ordered.should eql(['foo', 'foo:baz', 'foo:bar'])
   end
 
@@ -635,6 +648,7 @@ describe Rake::Task, ' local directory' do
   it 'should find closest project that matches current directory' do
     mkpath 'bar/src/main'
     define('foo') { define 'bar' }
+    project('foo:bar')
     @task.should_receive(:from).with('foo:bar')
     in_original_dir('bar/src/main') { @task.invoke }
   end
@@ -760,3 +774,4 @@ describe Buildr::Generate do
   end
 end
 =end
+
