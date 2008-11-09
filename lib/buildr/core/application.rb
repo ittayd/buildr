@@ -402,17 +402,24 @@ module Buildr
         end
       end
       load_imports
-      #Buildr.projects
+      initialize_projects
+    end
+   
+    def initialize_projects
+      found = nil
       top_level_tasks.each do |task_name|
         projects =  task_name.split(':').inject([[]]) { |projects, part| projects << (projects.last + [part]) }.reverse
         projects.each do |project|
           begin
-            project = Buildr.project(project.join(':'))
-            break if project
+            found = Buildr.project(project.join(':'))
+            break if found
           rescue
             nil
           end
         end
+      end
+      unless found # name of task doesn't refer to any project in particular, initialize the top ones
+        Buildr.projects
       end
     end
 
