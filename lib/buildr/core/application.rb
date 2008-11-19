@@ -116,7 +116,7 @@ module Buildr
 
     # Deprecated: rakefile/Rakefile, removed in 1.5
     DEFAULT_BUILDFILES = ['buildfile', 'Buildfile'] + DEFAULT_RAKEFILES
-    
+
     attr_reader :rakefiles, :requires
     private :rakefiles, :requires
 
@@ -173,7 +173,7 @@ module Buildr
 
     # Files that complement the buildfile itself
     def build_files #:nodoc:
-      deprecated 'Please call buildfile.prerequisites instead' 
+      deprecated 'Please call buildfile.prerequisites instead'
       buildfile.prerequisites
     end
 
@@ -208,7 +208,7 @@ module Buildr
     end
 
   protected
-    
+
     def load_buildfile # replaces load_rakefile
       standard_exception_handling do
         find_buildfile
@@ -256,6 +256,13 @@ module Buildr
         opts.separator ""
         opts.separator "Options are ..."
         
+        argv = ARGV.dup
+        while idx = argv.index('--require-early')
+          raise "missing argument: --require-early" unless val = argv[idx+1]
+          argv[idx,2] = []
+          require val
+        end
+
         opts.on_tail("-h", "--help", "-H", "Display this help message.") do
           puts opts
           exit
@@ -275,11 +282,11 @@ module Buildr
         ],
         ['--execute',  '-E CODE',
           "Execute some Ruby code after loading the buildfile",
-          lambda { |value| options.execute = value }            
+          lambda { |value| options.execute = value }
         ],
         ['--environment',  '-e ENV',
           "Environment name (e.g. development, test, production).",
-          lambda { |value| ENV['BUILDR_ENV'] = value }            
+          lambda { |value| ENV['BUILDR_ENV'] = value }
         ],
         ['--generate [PATH]',
          "Generate buildfile from either pom.xml file or directory path.",
@@ -302,8 +309,8 @@ module Buildr
           lambda { |value| verbose(false) }
         ],
         ['--buildfile', '-f FILE', "Use FILE as the buildfile.",
-          lambda { |value| 
-            @rakefiles.clear 
+          lambda { |value|
+            @rakefiles.clear
             @rakefiles << value
           }
         ],
@@ -324,6 +331,7 @@ module Buildr
             end
           }
         ],
+        ['--require-early MODULE', "Require module early"],
         ['--rules', "Trace the rules resolution.",
           lambda { |value| options.trace_rules = true }
         ],
@@ -404,7 +412,7 @@ module Buildr
       load_imports
       initialize_projects
     end
-   
+
     def initialize_projects
       found = nil
       top_level_tasks.each do |task_name|
@@ -413,13 +421,10 @@ module Buildr
           begin
             found = Buildr.project(project.join(':'))
             break if found
-          rescue
-            nil
+          rescue => detail
+            raise unless detail.message.match(/No such project/)
           end
         end
-      end
-      unless found # name of task doesn't refer to any project in particular, initialize the top ones
-        Buildr.projects
       end
     end
 
@@ -457,7 +462,7 @@ module Buildr
       end
     end
 
-    # Load artifact specs from the build.yaml file, making them available 
+    # Load artifact specs from the build.yaml file, making them available
     # by name ( ruby symbols ).
     def load_artifact_ns #:nodoc:
       hash = settings.build['artifacts']
@@ -466,7 +471,7 @@ module Buildr
       # Currently we only use one artifact namespace to rule them all. (the root NS)
       Buildr::ArtifactNamespace.load(:root => hash)
     end
-    
+
     # Loads buildr.rb files from users home directory and project directory.
     # Loads custom tasks from .rake files in tasks directory.
     def load_tasks #:nodoc:
@@ -540,8 +545,8 @@ module Buildr
     end
 
   end
-  
-  
+
+
   # This task stands for the buildfile and all its associated helper files (e.g., buildr.rb, build.yaml).
   # By using this task as a prerequisite for other tasks, you can ensure these tasks will be needed
   # whenever the buildfile changes.
