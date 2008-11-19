@@ -191,7 +191,7 @@ module Buildr
         super
       end
     end
-    
+
     class << self
 
       # :call-seq:
@@ -243,15 +243,17 @@ module Buildr
       # See Buildr#project.
       def project(*args) #:nodoc:
         options = Hash === args.last ? args.pop : {}
-        rake_check_options options, :scope if options
+        rake_check_options options, :scope, :no_invoke if options
         raise ArgumentError, 'Only one project name at a time' unless args.size == 1
         @projects ||= {}
        name = args.first.to_s
         parent_name = name.sub(/:?[^:]*$/, '')
         # Make sure parent project is evaluated (e.g. if looking for foo:bar, find foo first)
         unless parent_name.empty?
-          project(parent_name, options)
-        end        
+          # reduce the amount of output in trace
+          @projects_cache ||= {}
+          @projects_cache[[parent_name,options]] ||= project(parent_name, options)
+        end
         if options && options[:scope]
           # We assume parent project is evaluated.
           project = options[:scope].split(':').inject([[]]) { |scopes, scope| scopes << (scopes.last + [scope]) }.
@@ -260,34 +262,39 @@ module Buildr
         end
         project ||= @projects[name] # Not found in scope.
         raise "No such project #{name}" unless project
-        project.invoke
+        project.invoke unless options[:no_invoke]
         project
       end
 
       # :call-seq:
-      #   projects(*names) => projects
+      #   projects(*names, options?) => projects
       #
+      # options:
+      #   :scope - name of project from which name can be relative
+      #   :immediate - only return immediate children
+      #   :no_invoke - do not invoke the projects. only applicable if :immediate is true
       # See Buildr#projects.
       def projects(*names) #:nodoc:
         options = names.pop if Hash === names.last
-        rake_check_options options, :scope if options
+        rake_check_options options, :scope, :immediate, :no_invoke if options
         @projects ||= {}
         names = names.flatten
         if options && options[:scope]
           if names.empty?
-            parent = @projects[options[:scope].to_s] or raise "No such project #{options[:scope]}"
-            @projects.values.select { |project| project.parent == parent }.each { |project| project.invoke }.
-              map { |project| [project] + projects(:scope=>project) }.flatten.sort_by(&:name)
+            # must invoke the parent
+            parent = project(options[:scope].to_s) or raise "No such project #{options[:scope]}"
+            projects = @projects.values.select { |project| project.parent == parent }
+            projects.each { |project| project.invoke } unless options[:immediate] and options[:no_invoke]
+            projects = projects.map { |project| [project] + projects(options.merge({:scope=>project})) }.flatten.sort_by(&:name) unless options[:immediate]
+            projects
           else
-            names.uniq.map { |name| project(name, :scope=>options[:scope]) }
+            names.uniq.map { |name| project(name, options) }
           end
         elsif names.empty?
           # Parent project(s) not evaluated so we don't know all the projects yet.
-          @projects.values.each(&:invoke)
           @projects.keys.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
         else
           # Parent project(s) not evaluated, for the sub-projects we may need to find.
-          names.map { |name| name.split(':') }.select { |name| name.size > 1 }.map(&:first).uniq.each { |name| project(name) }
           names.uniq.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
         end
       end
@@ -344,7 +351,7 @@ module Buildr
       def local_projects(dir = nil, &block) #:nodoc:
         dir = File.expand_path(dir || Buildr.application.original_dir)
         projects = @projects ? @projects.values : []
-        projects = projects.select { |project| project.base_dir == dir }
+        projects = find_local_projects(dir, projects)
         if projects.empty? && dir != Dir.pwd && File.dirname(dir) != dir
           local_projects(File.dirname(dir), &block)
         elsif block
@@ -356,6 +363,15 @@ module Buildr
         else
           projects
         end
+      end
+
+      # limitation: dir must match exactly the base dir (not a sub dir)
+      def find_local_projects(dir, projects)
+        projects = projects.select{|p| dir.index(p.base_dir) == 0}
+        result = projects.select {|p| p.base_dir == dir}
+        sub_projects = projects.map {|p| p.projects(:immediate => true, :no_invoke => true)}.flatten
+        result |= find_local_projects(dir, sub_projects) unless sub_projects.empty?
+        result
       end
 
       # :call-seq:
