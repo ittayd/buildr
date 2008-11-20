@@ -187,8 +187,16 @@ module Buildr
     module RecursiveTask
       attr_accessor :project, :task_name
       def invoke_prerequisites(*args)
-        @prerequisites |= @project.projects.map {|project| project.task(@task_name)}
+        @prerequisites |= @project.projects(:immediate => true).map {|project| project.task(@task_name)}
         super
+      end
+    end
+
+    class NoSuchProject < ArgumentError
+      attr :name
+      def initialize(name)
+        super "No such project #{name}"
+        @name = name
       end
     end
 
@@ -250,9 +258,13 @@ module Buildr
         parent_name = name.sub(/:?[^:]*$/, '')
         # Make sure parent project is evaluated (e.g. if looking for foo:bar, find foo first)
         unless parent_name.empty?
-          # reduce the amount of output in trace
-          @projects_cache ||= {}
-          @projects_cache[[parent_name,options]] ||= project(parent_name, options)
+          begin
+            # reduce the amount of output in trace
+            @projects_cache ||= {}
+            @projects_cache[[parent_name,options]] ||= project(parent_name, options)
+          rescue NoSuchProject => detail
+            raise NoSuchProject.new(name)
+          end
         end
         if options && options[:scope]
           # We assume parent project is evaluated.
@@ -261,7 +273,7 @@ module Buildr
             select { |project| project }.last
         end
         project ||= @projects[name] # Not found in scope.
-        raise "No such project #{name}" unless project
+        raise NoSuchProject.new(name) unless project
         project.invoke unless options[:no_invoke]
         project
       end

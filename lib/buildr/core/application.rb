@@ -414,15 +414,14 @@ module Buildr
     end
 
     def initialize_projects
-      found = nil
       top_level_tasks.each do |task_name|
-        projects =  task_name.split(':').inject([[]]) { |projects, part| projects << (projects.last + [part]) }.reverse
+        projects =  task_name.split(':').inject([]) { |projects, part| projects << (projects.last.to_a + [part]) }.reverse
         projects.each do |project|
+          name = project.join(':')
           begin
-            found = Buildr.project(project.join(':'))
-            break if found
-          rescue => detail
-            raise unless detail.message.match(/No such project/)
+            break if Buildr.project(name)
+          rescue Project::NoSuchProject => detail
+            raise unless detail.name == name
           end
         end
       end
