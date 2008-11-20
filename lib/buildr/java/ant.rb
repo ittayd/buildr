@@ -19,7 +19,7 @@ autoload :Antwrap, 'antwrap'
 autoload :Logger, 'logger'
 require 'buildr/core/project'
 require 'buildr/core/help'
-
+require 'logger'
 
 module Buildr
   module Ant
@@ -69,7 +69,7 @@ module Buildr
     #   end
     def ant(name, &block)
       options = { :name=>name, :basedir=>Dir.pwd, :declarative=>true }
-      options.merge!(:logger=> Logger.new(STDOUT), :loglevel=> Logger::DEBUG) if Buildr.application.options.trace
+      options.merge!(:logger=> ::Logger.new(STDOUT), :loglevel=> ::Logger::DEBUG) if Buildr.application.options.trace
       Java.load
       Antwrap::AntProject.new(options).tap do |project|
         # Set Ant logging level to debug (--trace), info (default) or error only (--quiet).
