@@ -259,16 +259,14 @@ module Buildr
         # Make sure parent project is evaluated (e.g. if looking for foo:bar, find foo first)
         unless parent_name.empty?
           begin
-            # reduce the amount of output in trace
-            @projects_cache ||= {}
-            @projects_cache[[parent_name,options]] ||= project(parent_name, options)
+            project(parent_name, options)
           rescue NoSuchProject => detail
             raise NoSuchProject.new(name)
           end
         end
         if options && options[:scope]
           # We assume parent project is evaluated.
-          project = options[:scope].split(':').inject([[]]) { |scopes, scope| scopes << (scopes.last + [scope]) }.
+          project = options[:scope].to_s.split(':').inject([[]]) { |scopes, scope| scopes << (scopes.last + [scope]) }.
             map { |scope| @projects[(scope + [name]).join(':')] }.
             select { |project| project }.last
         end
@@ -287,14 +285,14 @@ module Buildr
       #   :no_invoke - do not invoke the projects. only applicable if :immediate is true
       # See Buildr#projects.
       def projects(*names) #:nodoc:
-        options = names.pop if Hash === names.last
+        options = Hash === names.last ? names.pop : {}
         rake_check_options options, :scope, :immediate, :no_invoke if options
         @projects ||= {}
         names = names.flatten
         if options && options[:scope]
           if names.empty?
-            # must invoke the parent
-            parent = project(options[:scope].to_s) or raise "No such project #{options[:scope]}"
+            # must invoke the parent. if the project is the one currently being invoked, then don't reinvoke
+            parent = options[:scope].tap{|p| p.invoke unless Thread.current[:rake_chain].instance_variable_get(:@value) == p}
             projects = @projects.values.select { |project| project.parent == parent }
             projects.each { |project| project.invoke } unless options[:immediate] and options[:no_invoke]
             projects = projects.map { |project| [project] + projects(options.merge({:scope=>project})) }.flatten.sort_by(&:name) unless options[:immediate]
@@ -304,10 +302,11 @@ module Buildr
           end
         elsif names.empty?
           # Parent project(s) not evaluated so we don't know all the projects yet.
-          @projects.keys.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
+          @projects.keys.map { |name| project(name, options) or raise NoSuchProject.new(name) }.
+          map {|project| [project] + (options[:immediate] ? [] : project.projects(options))}.flatten.sort_by(&:name)
         else
           # Parent project(s) not evaluated, for the sub-projects we may need to find.
-          names.uniq.map { |name| project(name) or raise "No such project #{name}" }.sort_by(&:name)
+          names.uniq.map { |name| project(name) or raise NoSuchProject.new(name) }.sort_by(&:name)
         end
       end
 
@@ -599,7 +598,7 @@ module Buildr
       if args.empty?
         self
       else
-        Project.project *(args + [{ :scope=>self.name }.merge(options)])
+        Project.project *(args + [{ :scope=>self }.merge(options)])
       end
     end
 
@@ -614,7 +613,7 @@ module Buildr
       else
         options = {}
       end
-      Project.projects *(args + [{ :scope=>self.name }.merge(options)])
+      Project.projects *(args + [{ :scope=>self }.merge(options)])
     end
 
     def inspect #:nodoc:
