@@ -303,7 +303,7 @@ module Buildr
         elsif names.empty?
           # Parent project(s) not evaluated so we don't know all the projects yet.
           @projects.keys.map { |name| project(name, options) or raise NoSuchProject.new(name) }.
-          map {|project| [project] + (options[:immediate] ? [] : project.projects(options))}.flatten.sort_by(&:name)
+          map {|project| [project] + (options[:immediate] ? [] : project.projects(options))}.flatten.uniq.sort_by(&:name)
         else
           # Parent project(s) not evaluated, for the sub-projects we may need to find.
           names.uniq.map { |name| project(name) or raise NoSuchProject.new(name) }.sort_by(&:name)
