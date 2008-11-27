@@ -261,6 +261,7 @@ module Buildr
           begin
             project(parent_name, options)
           rescue NoSuchProject => detail
+            raise if detail.name != parent_name
             raise NoSuchProject.new(name)
           end
         end
@@ -292,7 +293,8 @@ module Buildr
         if options && options[:scope]
           if names.empty?
             # must invoke the parent. if the project is the one currently being invoked, then don't reinvoke
-            parent = options[:scope].tap{|p| p.invoke unless Thread.current[:rake_chain].instance_variable_get(:@value) == p}
+            parent = @projects[options[:scope].to_s] or raise NoSuchProject.new(options[:scope].to_s)
+            parent.invoke unless parent.instance_variable_get(:@already_invoked)
             projects = @projects.values.select { |project| project.parent == parent }
             projects.each { |project| project.invoke } unless options[:immediate] and options[:no_invoke]
             projects = projects.map { |project| [project] + projects(options.merge({:scope=>project})) }.flatten.sort_by(&:name) unless options[:immediate]
@@ -378,11 +380,16 @@ module Buildr
 
       # limitation: dir must match exactly the base dir (not a sub dir)
       def find_local_projects(dir, projects)
-        projects = projects.select{|p| dir.index(p.base_dir) == 0}
-        result = projects.select {|p| p.base_dir == dir}
-        sub_projects = projects.map {|p| p.projects(:immediate => true, :no_invoke => true)}.flatten
-        result |= find_local_projects(dir, sub_projects) unless sub_projects.empty?
-        result
+        saved_chain, Thread.current[:rake_chain] = Thread.current[:rake_chain], nil
+        begin
+          projects = projects.select{|p| dir.index(p.base_dir) == 0}
+          result = projects.select {|p| p.base_dir == dir}
+          sub_projects = projects.map {|p| p.projects(:immediate => true, :no_invoke => true)}.flatten
+          result |= find_local_projects(dir, sub_projects) unless sub_projects.empty?
+          result
+        ensure
+          Thread.current[:rake_chain] = saved_chain
+        end
       end
 
       # :call-seq:
