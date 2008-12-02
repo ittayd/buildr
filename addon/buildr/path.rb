@@ -124,7 +124,7 @@ module Buildr
           project = Buildr.project(project_name)
         end
         path = project.path_to(nil)
-        Dir.chdir(@original_dir = path)
+        Dir.chdir(@original_dir = path) if File.directory? path
       end
       super
     end
