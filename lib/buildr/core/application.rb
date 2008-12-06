@@ -489,6 +489,7 @@ module Buildr
     end
 
     def display_tasks_and_comments
+      Buildr.projects
       displayable_tasks = tasks.select { |t| t.comment && t.name =~ options.show_task_pattern }
       if options.full_description
         displayable_tasks.each do |t|
@@ -509,6 +510,7 @@ module Buildr
     end
 
     def display_prerequisites
+      Buildr.projects
       displayable_tasks = tasks.select { |t| t.name =~ options.show_task_pattern }
       displayable_tasks.each do |t|
         puts "buildr #{t.name}"
