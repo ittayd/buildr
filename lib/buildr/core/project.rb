@@ -187,7 +187,8 @@ module Buildr
     module RecursiveTask
       attr_accessor :project, :task_name
       def invoke_prerequisites(*args)
-        @prerequisites |= @project.projects(:immediate => true).map {|project| project.task(@task_name)}
+        @prerequisites |= @project.projects(:immediate => true).
+           map {|project| Buildr.application.lookup(project.name + ':'  + @task_name)}.compact.map(&:to_s)
         super
       end
     end
