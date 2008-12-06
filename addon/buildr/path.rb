@@ -66,6 +66,7 @@ module Buildr
   # And run it
   # ./buildfile -p deep/down/project clean compile api/install
   module PathArgs
+    attr_reader :launch_dir
 
     def standard_buildr_options
       super +
@@ -106,6 +107,17 @@ module Buildr
       task
     end
 
+    def top_level #:nodoc:
+      if options.requested_workproj
+        project = Project.resolve_project(options.requested_workproj)
+        path = project.path_to(nil)
+        @launch_dir = original_dir
+        Dir.chdir(@original_dir = path) if File.directory? path
+      end
+      super
+    end
+
+
   private
 
     def find_buildfile #:nodoc:
@@ -114,23 +126,33 @@ module Buildr
       super
     end
 
-    def top_level #:nodoc:
-      if options.requested_workproj
-        path = File.expand_path(options.requested_workproj, original_dir)
-        if File.directory?(path)
-          project = Buildr::Project.local_projects(options.requested_workproj).first
-        else
-          project_name = options.requested_workproj.gsub(File::SEPARATOR, ':')
-          project = Buildr.project(project_name)
-        end
-        path = project.path_to(nil)
-        Dir.chdir(@original_dir = path) if File.directory? path
-      end
-      super
-    end
-
   end # PathArgs
 
   Buildr.application.extend PathArgs
 
+  class Project
+    class << self
+      def resolve_project(path_or_name)
+        path = File.expand_path(path_or_name, Buildr.application.launch_dir) 
+        if File.directory?(path)
+          project = local_projects(path_or_name).first
+        else
+          project_name = path_or_name.gsub(/\\|\//, ':')
+          project = Buildr.project(project_name)
+        end
+      end
+ 
+      alias_method :path_local_projects_original, :local_projects
+      def local_projects(dir = nil, &block) #:nodoc:
+        if dir.nil? && Buildr.application.options.requested_workproj 
+          project = resolve_project(Buildr.application.options.requested_workproj)
+          block[project]
+        else
+          path_local_projects_original(dir, &block)
+        end        
+      end
+      
+    end
+    
+  end  
 end
