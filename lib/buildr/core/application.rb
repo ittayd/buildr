@@ -640,7 +640,8 @@ module Rake #:nodoc
 
     def invoke_with_call_chain(task_args, invocation_chain)
       new_chain = InvocationChain.append(self, invocation_chain)
-      @lock.synchronize do
+      begin
+        @lock.mon_enter 
         if application.options.trace
           puts "** Invoke #{name} #{format_trace_flags}"
         end
@@ -658,6 +659,8 @@ module Rake #:nodoc
         ensure
           Thread.current[:rake_chain] = nil
         end
+      ensure
+        @lock.mon_exit
       end
     end
   end
