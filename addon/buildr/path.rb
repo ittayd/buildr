@@ -87,25 +87,26 @@ module Buildr
         ]
     end
 
-    # Lookup for a task using the given task_name.
-    # This method extends Rake's functionality to obtain the task for a file path
-    # or the build task if given a project basedir.
-    def lookup(task_name, initial_scope=nil) #nodoc:
-      unless task = super
-        original = File.expand_path(options.requested_workdir || '', original_dir)
-        path = File.expand_path(task_name, original)
-        if !(task = @tasks[path]) && project = Buildr::Project.local_projects(path).first
-          project_path = project.path_to(nil)
-          if project_path == path
-            task = @tasks[project.name + ':build']
-          else
-            project_task = path.sub(/^#{project_path}\/?/, '').gsub('/',':')
-            task = @tasks[project.name + ':' + project_task] || @tasks[project_task]
-          end
-        end
-      end
-      task
-    end
+     # ITTAY: using this increases run time by a large factor (30%). another alternative is to cache the tasks
+#    # Lookup for a task using the given task_name.
+#    # This method extends Rake's functionality to obtain the task for a file path
+#    # or the build task if given a project basedir.
+#    def lookup(task_name, initial_scope=nil) #nodoc:
+#      unless task = super
+#        original = File.expand_path(options.requested_workdir || '', original_dir)
+#        path = File.expand_path(task_name, original)
+#        if !(task = @tasks[path]) && project = Buildr::Project.local_projects(path).first
+#          project_path = project.path_to(nil)
+#          if project_path == path
+#            task = @tasks[project.name + ':build']
+#          else
+#            project_task = path.sub(/^#{project_path}\/?/, '').gsub('/',':')
+#            task = @tasks[project.name + ':' + project_task] || @tasks[project_task]
+#          end
+#        end
+#      end
+#      task
+#    end
 
     def top_level #:nodoc:
       if options.requested_workproj
@@ -133,12 +134,12 @@ module Buildr
   class Project
     class << self
       def resolve_project(path_or_name)
-        path = File.expand_path(path_or_name, Buildr.application.launch_dir) 
+        path = File.expand_path(path_or_name, Buildr.application.launch_dir)
         if File.directory?(path)
-          project = local_projects(path_or_name).first
+          local_projects(path_or_name).first
         else
           project_name = path_or_name.gsub(/\\|\//, ':')
-          project = Buildr.project(project_name)
+          Buildr.project(project_name)
         end
       end
  
