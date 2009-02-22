@@ -136,7 +136,7 @@ module Buildr
       def resolve_project(path_or_name)
         path = File.expand_path(path_or_name, Buildr.application.launch_dir)
         if File.directory?(path)
-          local_projects(path_or_name).first
+          local_projects(path).sort{|p1, p2| p1.name.length <=> p2.name.length}.first
         else
           project_name = path_or_name.gsub(/\\|\//, ':')
           Buildr.project(project_name)
