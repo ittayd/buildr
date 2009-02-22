@@ -180,7 +180,8 @@ module Buildr
       copy_map.each do |path, source|
         dest = File.expand_path(path, target.to_s)
         if File.directory?(source)
-          mkpath dest
+          mkpath dest, :verbose=>false
+          touch dest
         else
           mkpath File.dirname(dest)
           if @mapper.mapper_type
