@@ -386,7 +386,7 @@ module Buildr
           projects = projects.select{|p| dir.index(p.base_dir) == 0}
           result = projects.select {|p| p.base_dir == dir}
           sub_projects = projects.map {|p| p.projects(:immediate => true, :no_invoke => true)}.flatten
-          result |= find_local_projects(dir, sub_projects) unless sub_projects.empty?
+          result += find_local_projects(dir, sub_projects) unless sub_projects.empty?
           result
         ensure
           Thread.current[:rake_chain] = saved_chain
