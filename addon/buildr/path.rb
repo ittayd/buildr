@@ -110,9 +110,9 @@ module Buildr
 
     def top_level #:nodoc:
       if options.requested_workproj
+        @launch_dir = original_dir
         project = Project.resolve_project(options.requested_workproj)
         path = project.path_to(nil)
-        @launch_dir = original_dir
         Dir.chdir(@original_dir = path) if File.directory? path
       end
       super
